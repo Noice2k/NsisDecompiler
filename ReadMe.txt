@@ -1,3 +1,6 @@
+
+http://ptspts.blogspot.ru/2011/11/how-to-simply-compress-c-string-with.html
+
 ================================================================================
     MICROSOFT FOUNDATION CLASS LIBRARY : NsisDecompiler Project Overview
 ===============================================================================
