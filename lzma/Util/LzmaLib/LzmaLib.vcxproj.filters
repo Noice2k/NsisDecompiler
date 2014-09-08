@@ -1,0 +1,41 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Spec">
+      <UniqueIdentifier>{b4ff16f8-c033-44d7-af8b-83f323d650b7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="LzmaLibExports.c">
+      <Filter>Spec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Alloc.c" />
+    <ClCompile Include="..\..\LzFind.c" />
+    <ClCompile Include="..\..\LzFindMt.c" />
+    <ClCompile Include="..\..\LzmaDec.c" />
+    <ClCompile Include="..\..\LzmaEnc.c" />
+    <ClCompile Include="..\..\LzmaLib.c" />
+    <ClCompile Include="..\..\Threads.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Alloc.h" />
+    <ClInclude Include="..\..\IStream.h" />
+    <ClInclude Include="..\..\LzFind.h" />
+    <ClInclude Include="..\..\LzFindMt.h" />
+    <ClInclude Include="..\..\LzHash.h" />
+    <ClInclude Include="..\..\LzmaDec.h" />
+    <ClInclude Include="..\..\LzmaEnc.h" />
+    <ClInclude Include="..\..\LzmaLib.h" />
+    <ClInclude Include="..\..\Threads.h" />
+    <ClInclude Include="..\..\Types.h" />
+    <ClInclude Include="..\..\MyVersion.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resource.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="LzmaLib.def">
+      <Filter>Spec</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>
