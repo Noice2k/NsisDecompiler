@@ -5,7 +5,7 @@
 
 
 #define FH_FLAGS_MASK 15
-#define FH_FLAGS_UNINSTALL 1
+#define FH_FLAGS_UNINSTALL 1Inflate
 #define FH_FLAGS_SILENT 2
 #define FH_FLAGS_NO_CRC 4
 #define FH_FLAGS_FORCE_CRC 8
@@ -84,3 +84,29 @@ typedef struct
 	int str_uninstcmd;
 	int str_wininit;
 } header;
+
+
+typedef struct
+{
+	int dlg_id; // dialog resource id
+	int wndproc_id;
+	// called before the page is created, or if custom to show the page
+	// use Abort to skip the page
+	int prefunc;
+	// called right before page is shown
+	int showfunc;
+	// called when the user leaves to the next page
+	// use Abort to force the user to stay on this page
+	int leavefunc;
+
+	int flags;
+
+	int caption;
+	int back;
+	int next;
+	int clicknext;
+	int cancel;
+
+	int parms[5];
+} page;
+

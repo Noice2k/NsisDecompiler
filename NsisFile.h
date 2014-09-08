@@ -3,6 +3,7 @@
 #include <vector>
 #include "Header.h"
 #include "Compressor.h"
+#include "LZMA.h"
 
 
 class CNsisFile

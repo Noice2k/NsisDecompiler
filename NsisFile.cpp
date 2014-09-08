@@ -46,12 +46,33 @@ bool	CNsisFile::ProcessingHeader()
 		
 		//_offset+= 4;
 		// crc
-		for (int i = 0;i < 60;i++)
+	//	for (int i = 0;i < 60;i++)
 		{
+			byte * p= &_dump[_offset];
+			CFile file;
+			file.Open("D:\\ConduitInstaller\\spinstaller_s_exe\\123.dat",CFile::modeWrite|CFile::modeCreate,NULL);
 			
-			byte * p= &_dump[_offset+i];
+			file.Write(p,_firstheader.length_of_header);
+			file.Close();
+			
+			
 			_compressor.DecompressAndCopyToBuffer(p,hsize,&_dump_globalheader);
+			
+			_offset+=hsize;
 
+			p= &_dump[_offset];
+
+			 p= &_dump_globalheader[0]; 
+
+			DWORD hsize1 = *(DWORD*)  &_dump_globalheader[0];
+			DWORD hsize2 = *(DWORD*)  &_dump_globalheader[300];
+			DWORD hsize3 = *(DWORD*)  &_dump_globalheader[304];
+
+			memcpy(&_globalheader,&_dump_globalheader[4],sizeof(_globalheader));
+
+			//	read pages 
+			page *page1  =  (page *)&_dump_globalheader[30];
+			int h = 0;
 		}
 		
 		

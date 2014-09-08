@@ -14,4 +14,12 @@
 //
 // headers + datablock is at least 512 bytes if CRC enabled
 
-*headers = [4 compressed length][data]
+*headers = [4 compressed length][compressed data]
+
+[compressed data] = [total length][header(struct header)][pages(struct page) ??]
+
+
+
+
+nsis dont store the compress method - they simply used the stub.exe with included compressing algorithm. total 6 stubs lzma/bzip/lzw + _solid version.
+to detect the compression algorutm you need binary compare files from C:\Program Files (x86)\NSIS\Stubs\ and yours exe, the first 34 kb should be match at 98%

@@ -1,0 +1,35 @@
+// Settings common to both installers and uninstallers
+typedef struct
+{
+  int flags; // CH_FLAGS_*
+  struct block_header blocks[BLOCKS_NUM];
+
+  // InstallDirRegKey stuff
+  int install_reg_rootkey;
+  // these two are not processed!
+  int install_reg_key_ptr, install_reg_value_ptr;
+  int bg_color1, bg_color2, bg_textcolor;
+  // installation log window colors
+  int lb_bg, lb_fg;
+  // langtable size
+  int langtable_size;
+  // license background color
+  int license_bg;
+  // .on* calls
+  int code_onInit;
+  int code_onInstSuccess;
+  int code_onInstFailed;
+  int code_onUserAbort;
+  int code_onGUIInit;
+  int code_onGUIEnd;
+  int code_onMouseOverSection;
+  int code_onVerifyInstDir;
+  int code_onSelChange;
+  int code_onRebootFailed;
+  int install_types[NSIS_MAX_INST_TYPES+1];
+  int install_directory_ptr; // default install dir.
+  int install_directory_auto_append; // auto append part
+  int str_uninstchild;
+  int str_uninstcmd;
+  int str_wininit;
+} header;
