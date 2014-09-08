@@ -30,6 +30,7 @@ void CNsisDecompilerDlg::DoDataExchange(CDataExchange* pDX)
 BEGIN_MESSAGE_MAP(CNsisDecompilerDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_BN_CLICKED(IDC_BUTTON1, &CNsisDecompilerDlg::OnBnClickedButton1)
 END_MESSAGE_MAP()
 
 
@@ -85,3 +86,16 @@ HCURSOR CNsisDecompilerDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+
+/************************************************************************/
+//	start decompile file
+/************************************************************************/
+void CNsisDecompilerDlg::OnBnClickedButton1()
+{
+	//_nsisFile.LoadDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spinstaller_s.EOF");
+	_nsisFile.LoadDump("D:\\ConduitInstaller\\spinstaller_s_exe\\2.zip");
+		
+	if (true == _nsisFile.ProcessingHeader())
+	{
+	}
+}
