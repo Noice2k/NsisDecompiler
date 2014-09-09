@@ -23,13 +23,34 @@ public:
 	firstheader		_firstheader;
 	//	the main file header, this header in compressed
 	header			_globalheader;
-	//	the global header dump
-	std::vector<byte> _dump_globalheader;
 	//	the current offset;
 	int				_offset;
 
+	//	the dump structure:  global_dump = [4 bytes size header dump][header dump][...]
+
+	//	the global dump
+	std::vector<byte> _global_dump;
+	//	the header dump
+	std::vector<byte> _header_dump;
+
+	
+	
 
 	//	compressor/decompresor
 	CCompressor	    _compressor;
+
+private:
+	bool LoadPages();
+	bool LoadSection();
+	bool LoadEntries();
+
+	//	install pages
+	std::vector<page> _ipages;
+
+	//	install section
+	std::vector<section> _isection;
+
+	//	install entries
+	std::vector<entry>  _ientry;
 };
 

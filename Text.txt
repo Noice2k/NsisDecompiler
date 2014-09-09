@@ -16,7 +16,8 @@
 
 *headers = [4 compressed length][compressed data]
 
-[compressed data] = [total length][header(struct header)][pages(struct page) ??]
+[compressed data] = [headers length][headers][...]
+[headers] = [header(struct header)][page*NB_PAGES->num][Secstion*NB_SECTION->num]
 
 
 

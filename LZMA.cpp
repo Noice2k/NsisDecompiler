@@ -53,6 +53,7 @@ bool CLZMA::Inflate(byte* inbuff,size_t ilength,std::vector<byte> *out_vect)
 	SizeT  iprocessed = ilength;
 	ELzmaFinishMode finishMode = LZMA_FINISH_ANY;
 	
+	//SizeT currentproc
 
 
 	while (true)
@@ -63,8 +64,10 @@ bool CLZMA::Inflate(byte* inbuff,size_t ilength,std::vector<byte> *out_vect)
 			out_vect->push_back(buff[i]);
 		}
 		ilength-= iprocessed;
-		iprocessed = ilength;
 		inbuff += iprocessed;
+
+		iprocessed = ilength;
+		
 		oprocessed = OBUFSIZE;
 		if (ilength  == 0)
 		{
@@ -73,6 +76,10 @@ bool CLZMA::Inflate(byte* inbuff,size_t ilength,std::vector<byte> *out_vect)
 		if (result != 0)
 		{
 			int i =0;
+			break;
+		}
+		if (status == LZMA_STATUS_FINISHED_WITH_MARK)
+		{
 			break;
 		}
 	}
