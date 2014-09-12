@@ -83,9 +83,6 @@ bool CLZMA::Inflate(byte* inbuff,size_t ilength,std::vector<byte> *out_vect)
 			break;
 		}
 	}
-	
-	
-	
-	
+	LzmaDec_Free(&_state, &g_Alloc);
 	return true;
 }

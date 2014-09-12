@@ -93,9 +93,17 @@ HCURSOR CNsisDecompilerDlg::OnQueryDragIcon()
 void CNsisDecompilerDlg::OnBnClickedButton1()
 {
 	//_nsisFile.LoadDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spinstaller_s.EOF");
-	_nsisFile.LoadDump("D:\\ConduitInstaller\\spinstaller_s_exe\\5.zip");
-		
-	if (true == _nsisFile.ProcessingHeader())
-	{
-	}
+	//_nsisFile.LoadDump("D:\\ConduitInstaller\\spinstaller_s_exe\\1.zip");
+	//_nsisFile.LoadExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spinstaller.exe");
+	/*_nsisFile.LoadExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spnocrc.exe");
+	_nsisFile.ProcessingHeader();
+	_nsisFile.DumpFiles("d:\\ConduitInstaller\\_dump");
+	_nsisFile.SaveExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spnocrc_t.exe");
+	*/
+
+	_nsisFile.LoadExeDump("D:\\ConduitInstaller\\_dump\\0002.dll");
+	_nsisFile.SaveExeDump("D:\\ConduitInstaller\\_dump\\0002t.dll");
+
+
+	
 }

@@ -16,7 +16,8 @@
 
 *headers = [4 compressed length][compressed data]
 
-[compressed data] = [headers length][headers][...]
+[compressed data] = [size][headers][size][uninstaller exe header][size][file 1][size][file2] ... 
+
 [headers] = [header(struct header)][page*NB_PAGES->num][Secstion*NB_SECTION->num]
 
 
