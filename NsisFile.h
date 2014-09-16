@@ -13,6 +13,7 @@ struct sfile
 	DWORD  size;
 };
 
+static int *cur_langtable;
 class CNsisFile
 {
 public:
@@ -45,6 +46,8 @@ public:
 	//	the current offset;
 	int				_offset;
 
+    
+
 	//	the dump structure:  global_dump = [4 bytes size header dump][header dump][...]
 
 	//	the global dump
@@ -73,9 +76,11 @@ private:
 	void ProcessingEntries();
 	std::string EntryToString(entry ent);
 
+    //  decode functions
 	std::string DecodePushPop(entry ent);
+    std::string DecodeAssign(entry ent);
 
-	std::string DecodeAssign(entry ent);
+    std::string GetNsisString(int offset);
 
 
 	//	install pages
@@ -91,6 +96,7 @@ private:
 
 	//	byte array to the stings
 	std::vector<WCHAR>	_nsis_string_table;
+    std::vector<int>  _nsis_launguage_table;
 
 	//	vector to nsis files (inclide uninstaller, plugins and installation files)
 	std::vector<sfile>  _nsis_files;

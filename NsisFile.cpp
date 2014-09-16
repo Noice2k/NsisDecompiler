@@ -334,12 +334,12 @@ bool	CNsisFile::ProcessingHeader()
 			//	 decompress all data to 
 			_compressor.DecompressAndCopyToBuffer(p,_dump.size()-_offset,&_global_dump);
 			
-			CFile file;
+		/*	CFile file;
 			file.Open("D:\\ConduitInstaller\\spinstaller_s_exe\\all.dat",CFile::modeWrite|CFile::modeCreate,NULL);
 			
 			file.Write(&_global_dump[0],_global_dump.size());
 			file.Close();
-
+            */
 			
 			// 4 bytes - length of header;
 			DWORD s = *(DWORD*)&_global_dump[0];
@@ -479,11 +479,35 @@ bool CNsisFile::LoadStrings()
 /************************************************************************/
 bool CNsisFile::LoadLandTables()
 {
-	int offset	= _globalheader.blocks[NB_LANGTABLES].offset;
-	int count	= _globalheader.blocks[NB_CTLCOLORS].offset - _globalheader.blocks[NB_LANGTABLES].offset;
-	WCHAR * wc = &_nsis_string_table[0x0409];
+	int offset	= _globalheader.blocks[NB_LANGTABLES].offset + sizeof(LANGID)+2*sizeof(int);
+	int count	= (_globalheader.langtable_size)/4;
+    
+/*
+    char *language_table=0;
+    int lang_num;
+    int *selected_langtable=0;
 
+    // Jim Park: We are doing byte offsets to get to various data structures so
+    // no TCHARs here.
 
+    WCHAR * wc = (WCHAR *)&_header_dump[offset];
+    lang_num= _globalheader.blocks[NB_LANGTABLES].num;
+    language_table=((char*)&_header_dump[offset]);
+    selected_langtable=(int*)(language_table+sizeof(LANGID)+2*sizeof(int));
+
+/*            dlg_offset=*(int*)(language_table+sizeof(LANGID));
+            g_exec_flags.rtl=*(int*)(language_table+sizeof(LANGID)+sizeof(int));
+            
+            break;
+        
+    
+
+    */
+    int * t = (int*) &_header_dump[offset];
+    
+    _nsis_launguage_table.insert(_nsis_launguage_table.begin(),t,t+count);
+	
+    
 
 	return true;
 }
@@ -507,8 +531,47 @@ void CNsisFile::ProcessingEntries()
 
 }
 
+#define LANG_STR_TAB(x) cur_langtable[-((int)x+1)]
+#define GetNSISTab(strtab) (strtab < 0 ? LANG_STR_TAB(strtab) : strtab)
+#define GetNSISStringNP(strtab) ((const TCHAR *)_globalheader.blocks[NB_STRINGS].offset+(strtab))
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+std::string CNsisFile::GetNsisString(int offset)
+{
+
+    // This looks at the g_block (copied from header->blocks) and
+    // indexes into the language
+  //  TCHAR *in = (TCHAR*)GetNSISStringNP(GetNSISTab(offset));
 
 
+    std::string str;
+
+    if (offset < 0)
+    {
+        offset *= -1;
+        offset +=1;
+        
+        int off2 = (int)_nsis_launguage_table[offset];
+        WCHAR *w = &_nsis_string_table[off2];
+        std::wstring wstr = w;
+        std::string s( wstr.begin(), wstr.end() );
+        
+        return s;
+    }
+    
+
+
+    WCHAR *w = &_nsis_string_table[offset];
+
+    return str;
+
+}
+
+/************************************************************************/
+//  decode push/pop string
+/************************************************************************/
 std::string CNsisFile::DecodePushPop(entry ent)
 {
 	char buff[0x100];
@@ -526,8 +589,8 @@ std::string CNsisFile::DecodePushPop(entry ent)
 		}
 		else
 		{
+            std::string str = GetNsisString(ent.offsets[0]);
 			sprintf_s(buff,0x100,"Push string #%i",ent.offsets[0]);
-
 		}
 	}
 
