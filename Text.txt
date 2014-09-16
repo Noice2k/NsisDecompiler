@@ -25,3 +25,12 @@
 
 nsis dont store the compress method - they simply used the stub.exe with included compressing algorithm. total 6 stubs lzma/bzip/lzw + _solid version.
 to detect the compression algorutm you need binary compare files from C:\Program Files (x86)\NSIS\Stubs\ and yours exe, the first 34 kb should be match at 98%
+
+
+lang_table - the array offsets for string table. if you need e
+
+lang_table[x]  = offeset in 
+
+
+global_wars[0] - path
+global_wars[1] - $0
