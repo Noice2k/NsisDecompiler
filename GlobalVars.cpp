@@ -51,18 +51,18 @@ std::string CGlobalVars::GetVarName(int id)
 		case 17: str = "$R7";break;
 		case 18: str = "$R8";break;
 		case 19: str = "$R9";break;
-		case 20: str = "CMDLINE";break;       // 20 everything before here doesn't have trailing slash removal
-		case 21: str = "INSTDIR";break;       // 21
-		case 22: str = "OUTDIR";break;        // 22
-		case 23: str = "EXEDIR";break;        // 23
-		case 24: str = "LANGUAGE";break;      // 24
-		case 25: str = "TEMP";break;         // 25
-		case 26: str = "PLUGINSDIR";break;   // 26
-		case 27: str = "EXEPATH";break;      // 27
-		case 28: str = "EXEFILE";break;      // 28
-		case 29: str = "HWNDPARENT";break;   // 29
-		case 30: str = "_CLICK";break;       // 30
-		case 31: str = "OUTDIR";break;       // 31
+		case 20: str = "$CMDLINE";break;       // 20 everything before here doesn't have trailing slash removal
+		case 21: str = "$INSTDIR";break;       // 21
+		case 22: str = "$OUTDIR";break;        // 22
+		case 23: str = "$EXEDIR";break;        // 23
+		case 24: str = "$LANGUAGE";break;      // 24
+		case 25: str = "$TEMP";break;         // 25
+		case 26: str = "$PLUGINSDIR";break;   // 26
+		case 27: str = "$EXEPATH";break;      // 27
+		case 28: str = "$EXEFILE";break;      // 28
+		case 29: str = "$HWNDPARENT";break;   // 29
+		case 30: str = "$_CLICK";break;       // 30
+		case 31: str = "$OUTDIR";break;       // 31
 
 
 		default:

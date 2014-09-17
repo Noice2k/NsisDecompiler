@@ -9,8 +9,10 @@
 
 struct sfile
 {
-	byte * pointer;
-	DWORD  size;
+	byte *	pointer;
+	DWORD	size;
+	int		offset;
+	char	filename[0x200];
 };
 
 static int *cur_langtable;
@@ -71,7 +73,7 @@ private:
 	bool LoadEntries();
 	bool LoadStrings();
 	bool LoadLandTables();
-
+	
 	//	
 	void ProcessingEntries();
 	std::string EntryToString(entry ent);
@@ -79,9 +81,15 @@ private:
     //  decode functions
 	std::string DecodePushPop(entry ent);
     std::string DecodeAssign(entry ent);
+	std::string DecodeIntOp(entry ent);
+	std::string DecodeStrCmp(entry ent);
+	std::string DecodeNopJump(entry ent);
+	std::string DecodeExtractFile(entry ent);
+	std::string DecodeFileOperation(entry ent);
 
     std::string GetNsisString(int offset);
 
+	std::string GetStringFromParm(entry ent,int id);
 
 	//	install pages
 	std::vector<page> _nsis_pages;

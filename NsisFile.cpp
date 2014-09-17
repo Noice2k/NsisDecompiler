@@ -351,18 +351,17 @@ bool	CNsisFile::ProcessingHeader()
 			//	copy the header
 			memcpy(&_globalheader,&_header_dump[0],sizeof(header));
 			unsigned  off = s + 4;
+			unsigned beginoff = s+4;
 			while (off < _global_dump.size())
 			{
 				sfile sf;
 				DWORD size = *(DWORD*)&_global_dump[off];
-				off+=4;
-				
-				sf.pointer = &_global_dump[off];
 				sf.size    = size;
+				sf.offset  = off-beginoff;
+				off+=4;
+				sf.pointer = &_global_dump[off];
 				_nsis_files.push_back(sf);
 				off+= size;
-				
-
 			}
 
 			if (false == LoadPages()) 
@@ -512,60 +511,110 @@ bool CNsisFile::LoadLandTables()
 	return true;
 }
 
-/************************************************************************/
-/*                                                                      */
-/************************************************************************/
-void CNsisFile::ProcessingEntries()
-{
-	std::string all;
-	for (unsigned i = 0x00;i<_nsis_entry.size(); i++ )
-	{
-		entry ent = _nsis_entry[i];
-		std::string str = EntryToString(ent);
-		_nsis_script_code.push_back(str);
-		all += str;
-		all += "\r\n";
-
-	}
-
-
-}
-
 #define LANG_STR_TAB(x) cur_langtable[-((int)x+1)]
 #define GetNSISTab(strtab) (strtab < 0 ? LANG_STR_TAB(strtab) : strtab)
 #define GetNSISStringNP(strtab) ((const TCHAR *)_globalheader.blocks[NB_STRINGS].offset+(strtab))
 
+#define NS_SKIP_CODE 0xE000
+#define NS_VAR_CODE 0xE001
+#define NS_SHELL_CODE 0xE002
+#define NS_LANG_CODE 0xE003
+#define NS_CODES_START NS_SKIP_CODE
+#define NS_IS_CODE(x) ((x) & 0xE000)
+
+#define DECODE_SHORT(c) ((WORD)(c[0]&0x7FFF))
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
 std::string CNsisFile::GetNsisString(int offset)
 {
+	std::wstring wstr;
 
-    // This looks at the g_block (copied from header->blocks) and
-    // indexes into the language
-  //  TCHAR *in = (TCHAR*)GetNSISStringNP(GetNSISTab(offset));
+	// the real offset in the string table
+	int real_offset = 0x00;
+	//	 lang table
+	if (offset < 0)
+	{
+		// make offset to positive value
+		offset *= -1;
+		//	make +1 to convert -1 => 0 
+		offset +=1;
+		real_offset = (int)_nsis_launguage_table[offset];
+	}
+	//	string table
+	else 
+	{
+		real_offset = offset;
+	}
+	// try to decode string in 
+
+	WCHAR * in = &_nsis_string_table[real_offset];
 
 
-    std::string str;
+	while (true)
+	{
+		WCHAR nVarIdx = _nsis_string_table[real_offset];
+		real_offset++;
+		in = &_nsis_string_table[real_offset];
+		if (nVarIdx == 0x00)  break;
 
-    if (offset < 0)
-    {
-        offset *= -1;
-        offset +=1;
-        
-        int off2 = (int)_nsis_launguage_table[offset];
-        WCHAR *w = &_nsis_string_table[off2];
-        std::wstring wstr = w;
-        std::string s( wstr.begin(), wstr.end() );
-        
-        return s;
-    }
-    
+		int nData;
+		int fldrs[4];
+
+		// Looks redundant for ASCII but is not for Unicode.
+		if (NS_IS_CODE(nVarIdx) && nVarIdx > NS_CODES_START)
+		{
+			// nData = ((in[1] & 0x7F) << 7) | (in[0] & 0x7F);
+			// DECODE_SHORT is the Unicode/ANSI version of the above.
+			nData = DECODE_SHORT(in);
+
+			// Special folders identified by their Constant Special Item ID (CSIDL)
+
+			fldrs[1] = *in & 0x00FF; // current user
+			fldrs[0] = fldrs[1] | CSIDL_FLAG_CREATE;
+			fldrs[3] = (*in & 0xFF00) >> 8; // all users
+			fldrs[2] = fldrs[3] | CSIDL_FLAG_CREATE;
+
+			real_offset++;
+			if (nVarIdx == NS_SHELL_CODE)
+			{
+				LPITEMIDLIST idl;
+
+				int x = 2;
+				DWORD ver = GetVersion();
+			}
+			if (nVarIdx == NS_LANG_CODE)
+			{
+
+				std::string str1 = GetNsisString(-nData+1);
+				wstr.insert(wstr.end(),str1.begin(),str1.end());
+
+				//GetNSISString(out, -nData-1);
+			}
 
 
-    WCHAR *w = &_nsis_string_table[offset];
-
-    return str;
+			if (nVarIdx == NS_VAR_CODE)
+			{
+				if (nData == 29)
+				{
+					wstr += L"$HWNDPARENT";
+				}
+				else
+				{
+					std::string var = _global_vars.GetVarName(nData);
+					wstr.insert(wstr.end(),var.begin(),var.end());
+				}
+			}
+		}
+		else
+		{
+			wstr.insert(wstr.end(),nVarIdx);
+		}
+	}
+	//	convert wstring to string
+	std::string str(wstr.begin(),wstr.end());
+	//	return result
+	return str;
 
 }
 
@@ -589,28 +638,185 @@ std::string CNsisFile::DecodePushPop(entry ent)
 		}
 		else
 		{
-            std::string str = GetNsisString(ent.offsets[0]);
-			sprintf_s(buff,0x100,"Push string #%i",ent.offsets[0]);
+			std::string str = GetNsisString(ent.offsets[0]);
+			sprintf_s(buff,0x100,"Push [%s]",str.c_str());
 		}
 	}
 
 
 
-	
+
 	// sprintf_s(buff,0x100,"Push/Pop/Exchange: 3 [variable/string, ?pop:push, ?exch] [%i,%i,%i,%i,%i,%i]",ent.offsets[0],ent.offsets[1],ent.offsets[2],ent.offsets[3],ent.offsets[4],ent.offsets[5]);
 	std::string result = buff;
 
 	return result;
 }
 
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
 std::string CNsisFile::DecodeAssign(entry ent)
 {
-	char buff[0x100];
-	"Assign: 4 [variable (0-9) to assign, string to assign, maxlen, startpos]";
-	sprintf_s(buff,0x100,"Assign: 4 [variable (0-9) to assign, string to assign, maxlen, startpos] [%i,%i,%i,%i]",ent.offsets[0],ent.offsets[1],ent.offsets[2],ent.offsets[3]);
-	std::string result = buff;
-
+	std::string var = _global_vars.GetVarName(ent.offsets[0]);
+	std::string text = GetNsisString(ent.offsets[1]);
+	std::string start = GetNsisString(ent.offsets[2]);
+	std::string off = GetNsisString(ent.offsets[3]);
+	std::string result = "StrCpy "+var + " [" + text + "] " + start + " " + off;
 	return result;
+}
+
+/************************************************************************/
+//	decode IntOp 
+/************************************************************************/
+std::string CNsisFile::DecodeIntOp(entry ent)
+{
+	//
+	std::string str;
+	std::string out = _global_vars.GetVarName(ent.offsets[0]);
+	std::string var1 = GetNsisString(ent.offsets[1]);
+	std::string var2 = GetNsisString(ent.offsets[2]);
+	std::string operand;
+	switch (ent.offsets[3])
+	{
+	case 0: operand =var1 +  " + "+  var2; break;
+	case 1: operand =var1 +  " - "+  var2; break;
+	case 2: operand =var1 +  " * "+  var2; break;
+	case 3: operand =var1 +  " / "+  var2;break;
+	case 4: operand =var1 +  " | "+  var2;; break;
+	case 5: operand =var1 +  " & "+  var2;; break;
+	case 6: operand =var1 +  " ^ "+  var2; break;
+	case 7: operand =var1 +  " ! "+  var2; break;
+	case 8: operand =var1 +  " || "+  var2; break;
+	case 9: operand =var1 +  " && "+  var2;; break;
+	case 10: operand =var1 +  " % "+  var2;break;
+	case 11: operand =var1 +  " << "+  var2; break;
+	case 12: operand =var1 +  " >> "+  var2; break;
+	}
+	//	"IntOp: 4 [output, input1, input2, op] where op: 0=add, 1=sub, 2=mul, 3=div, 4=bor, 5=band, 6=bxor, 7=bnot input1, 8=lnot input1, 9=lor, 10=land], 11=1%2"	
+	str = "IntOp " + out +" "+ operand;
+	return str;
+}
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+std::string CNsisFile::GetStringFromParm(entry ent,int id_)
+{
+	int id = id_ < 0 ? -id_ : id_;
+	std::string str = GetNsisString( ent.offsets[id & 0xF]);
+	return str;
+}
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+std::string CNsisFile::DecodeStrCmp(entry ent)
+{
+	std::string str;
+	std::string var1 = GetStringFromParm(ent,0x20);
+	std::string var2 = GetStringFromParm(ent,0x31);
+
+	char buff[0x10];
+	sprintf_s(buff,0x10,"] %i %i",ent.offsets[2],ent.offsets[3]);
+	str = "StrCmp [" + var1 + "] ["+ var2;
+	str += buff;
+	//	"StrCmp: 5 [str1, str2, jump_if_equal, jump_if_not_equal, case-sensitive?]"
+	return str;
+
+}
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+std::string CNsisFile::DecodeNopJump(entry ent)
+{
+	//" Nop/Jump, do nothing: 1, [?new address+1:advance one]"
+	
+	char buff[0x10];
+	if (ent.offsets[0] == 0)
+	{
+		sprintf_s(buff,0x10,"Nop");
+	}
+	else
+	{
+		sprintf_s(buff,0x10,"Jump  %i",ent.offsets[0]);
+	}
+
+	return buff;
+}
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+std::string CNsisFile::DecodeExtractFile(entry ent)
+{
+	//	"File to extract: 6 [overwriteflag, output filename, compressed filedata, filedatetimelow, filedatetimehigh, allow ignore] overwriteflag: 0x1 = no. 0x0=force, 0x2=try, 0x3=if date is newer"
+	std::string name = GetStringFromParm(ent,0x31);
+	for (unsigned i=0x00;i<_nsis_files.size();i++)
+	{
+		sfile *sf = &_nsis_files[i];
+		if (sf->offset == ent.offsets[2])
+		{
+			memset(sf->filename,0,sizeof(sf->filename));
+			int len = min(sizeof(sf->filename)-1,name.length());
+			memcpy(sf->filename,name.c_str(),len);
+		}
+	}
+	int overwriteflag = ent.offsets[0] & 7;
+
+	std::string str = "File "+ name;
+	return str;
+}
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+std::string CNsisFile::DecodeFileOperation(entry ent)
+{
+	std::string str ;
+	switch (ent.which)
+	{
+	case EW_FCLOSE:
+		{
+			str = "FileClose " + _global_vars.GetVarName(ent.offsets[0]);
+		}
+		break;
+	case EW_FOPEN:
+		{
+			std::string handle = _global_vars.GetVarName(ent.offsets[0]);
+			std::string name = GetStringFromParm(ent,-0x13);
+			std::string mode = GetNsisString(ent.offsets[2]); 
+			str = "FileOpen " + handle + " " + name ; 
+		}
+		break;
+	case EW_FPUTS:
+			str = "FileWrite: 3 [handle, string, ?int:string]";break;
+		break;
+	case EW_FGETS:
+			str = "FileRead: 4  [handle, output, maxlen, ?getchar:gets]";break;
+		break;
+	case EW_FPUTWS:
+			str = "FileWriteUTF16LE: 3 [handle, string, ?int:string]";break;
+		break;
+	case EW_FGETWS:
+		{
+			std::string handle	= _global_vars.GetVarName(ent.offsets[0]);
+			std::string out		= _global_vars.GetVarName(ent.offsets[1]);
+			std::string maxlen	= GetNsisString(ent.offsets[0]);
+
+			str = "FileReadUTF16LE: 4 [handle, output, maxlen, ?getchar:gets]";
+		}break;
+	case EW_FSEEK:
+		{
+			std::string handle = _global_vars.GetVarName(ent.offsets[0]);
+			std::string offset = _global_vars.GetVarName(ent.offsets[1]);
+
+			str = "FileSeek " + handle + " " + offset;
+		}break;
+	default:
+		break;
+	}
+	return str;
 }
 
 std::string CNsisFile::EntryToString(entry ent)
@@ -618,9 +824,10 @@ std::string CNsisFile::EntryToString(entry ent)
 	std::string str;
 	switch ( ent.which)
 	{
-		case EW_INVALID_OPCODE:		str = " zero is invalid. useful for catching errors. (otherwise an all zeroes instruction does nothing, which is easily ignored but means something is wrong."; break;
+		//case EW_INVALID_OPCODE:		str = " zero is invalid. useful for catching errors. (otherwise an all zeroes instruction does nothing, which is easily ignored but means something is wrong."; break;
+		case EW_INVALID_OPCODE:		str = " "; break;
 		case EW_RET:				str = "return from function call";break;
-		case EW_NOP:				str = " Nop/Jump, do nothing: 1, [?new address+1:advance one]";break;
+		case EW_NOP:				str = DecodeNopJump(ent);break;
 		case EW_ABORT:				str = "Abort: 1 [status]";break;
 		case EW_QUIT:				str = "Quit: 0";break;
 		case EW_CALL:				str = "Call: 1 [new address+1]";break;
@@ -638,16 +845,16 @@ std::string CNsisFile::EntryToString(entry ent)
 		case EW_GETFULLPATHNAME:	str = "GetFullPathName: 2 [output, input, ?lfn:sfn]";break;
 		case EW_SEARCHPATH:			str = "SearchPath: 2 [output, filename]";break;
 		case EW_GETTEMPFILENAME:	str = "GetTempFileName: 2 [output, base_dir]";break;
-		case EW_EXTRACTFILE:		str = "File to extract: 6 [overwriteflag, output filename, compressed filedata, filedatetimelow, filedatetimehigh, allow ignore] overwriteflag: 0x1 = no. 0x0=force, 0x2=try, 0x3=if date is newer";break;
+		case EW_EXTRACTFILE:		str = DecodeExtractFile(ent);break;
 		case EW_DELETEFILE:			str = "Delete File: 2, [filename, rebootok]";break;
 		case EW_MESSAGEBOX:			str = "MessageBox: 5,[MB_flags,text,retv1:retv2,moveonretv1:moveonretv2]";break;
 		case EW_RMDIR:				str = "RMDir: 2 [path, recursiveflag]";break;
 		case EW_STRLEN:				str = " StrLen: 2 [output, input]";break;
 		case EW_ASSIGNVAR:			str = DecodeAssign(ent);break;
-		case EW_STRCMP:				str = "StrCmp: 5 [str1, str2, jump_if_equal, jump_if_not_equal, case-sensitive?]";break;
+		case EW_STRCMP:				str = DecodeStrCmp(ent);break;
 		case EW_READENVSTR:			str = "ReadEnvStr/ExpandEnvStrings: 3 [output, string_with_env_variables, IsRead]";break;
 		case EW_INTCMP:				str = "IntCmp: 6 [val1, val2, equal, val1<val2, val1>val2, unsigned?]";break;
-		case EW_INTOP:				str = "IntOp: 4 [output, input1, input2, op] where op: 0=add, 1=sub, 2=mul, 3=div, 4=bor, 5=band, 6=bxor, 7=bnot input1, 8=lnot input1, 9=lor, 10=land], 11=1%2";break;
+		case EW_INTOP:				str = DecodeIntOp(ent);break;
 		case EW_INTFMT:				str = "IntFmt: [output, format, input]";break;
 		case EW_PUSHPOP:			str = DecodePushPop(ent);break;
 		case EW_FINDWINDOW:			str = "FindWindow: 5, [outputvar, window class,window name, window_parent, window_after]";break;
@@ -674,13 +881,13 @@ std::string CNsisFile::EntryToString(entry ent)
 		case EW_WRITEREG:			str = "Write Registry value: 5, [RootKey(int),KeyName,ItemName,ItemData,typelen]  typelen=1 for str, 2 for dword, 3 for binary, 0 for expanded str";break;
 		case EW_READREGSTR:			str = "ReadRegStr: 5 [output, rootkey(int), keyname, itemname, ==1?int::str]";break;
 		case EW_REGENUM:			str = "RegEnum: 5 [output, rootkey, keyname, index, ?key:value]";break;
-		case EW_FCLOSE:				str = "FileClose: 1 [handle]";break;
-		case EW_FOPEN:				str = "FileOpen: 4  [name, openmode, createmode, outputhandle]";break;
-		case EW_FPUTS:				str = "FileWrite: 3 [handle, string, ?int:string]";break;
-		case EW_FGETS:				str = "FileRead: 4  [handle, output, maxlen, ?getchar:gets]";break;
-		case EW_FPUTWS:				str = "FileWriteUTF16LE: 3 [handle, string, ?int:string]";break;
-		case EW_FGETWS:				str = "FileReadUTF16LE: 4 [handle, output, maxlen, ?getchar:gets]";break;
-		case EW_FSEEK:				str = "FileSeek: 4  [handle, offset, mode, >=0?positionoutput]";break;
+		case EW_FCLOSE:				str = DecodeFileOperation(ent);break;
+		case EW_FOPEN:				str = DecodeFileOperation(ent);break;
+		case EW_FPUTS:				str = DecodeFileOperation(ent);break;
+		case EW_FGETS:				str = DecodeFileOperation(ent);break;
+		case EW_FPUTWS:				str = DecodeFileOperation(ent);break;
+		case EW_FGETWS:				str = DecodeFileOperation(ent);break;
+		case EW_FSEEK:				str = DecodeFileOperation(ent);break;
 		case EW_FINDCLOSE:			str = "FindClose: 1 [handle]";break;
 		case EW_FINDNEXT:			str = " FindNext: 2  [output, handle]";break;
 		case EW_FINDFIRST:			str = "FindFirst: 2 [filespec, output, handleoutput]";break;
@@ -696,4 +903,25 @@ std::string CNsisFile::EntryToString(entry ent)
 		break;
 	}
 	return str;
+}
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+void CNsisFile::ProcessingEntries()
+{
+	std::string all;
+	char buff[0x10];
+	for (unsigned i = 0x00;i<_nsis_entry.size(); i++ )
+	{
+		entry ent = _nsis_entry[i];
+		sprintf_s(buff,0x10,"%4.4i : ",i );
+		std::string str = buff;
+		str += EntryToString(ent);
+		_nsis_script_code.push_back(str);
+		all += str;
+		all += "\r\n";
+	}
+
+
 }

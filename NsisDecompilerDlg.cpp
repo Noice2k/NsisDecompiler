@@ -95,9 +95,9 @@ void CNsisDecompilerDlg::OnBnClickedButton1()
 	//_nsisFile.LoadDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spinstaller_s.EOF");
 	//_nsisFile.LoadDump("D:\\ConduitInstaller\\spinstaller_s_exe\\1.zip");
 	//_nsisFile.LoadExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spinstaller.exe");
-	//_nsisFile.LoadExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spnocrc.exe");
+	_nsisFile.LoadExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spnocrc.exe");
 	//_nsisFile.LoadExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\FPSetup.exe");
-    _nsisFile.LoadExeDump("D:\\NSIS_uni\\test.exe");
+    //_nsisFile.LoadExeDump("D:\\NSIS_uni\\test.exe");
 	
 	_nsisFile.ProcessingHeader();
 	_nsisFile.DumpFiles("d:\\ConduitInstaller\\_dump");
