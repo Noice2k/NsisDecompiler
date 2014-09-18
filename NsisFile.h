@@ -76,6 +76,9 @@ private:
 	
 	//	
 	void ProcessingEntries();
+
+	void ProcessingFunctions();
+
 	std::string EntryToString(entry ent);
 
     //  decode functions
@@ -83,9 +86,17 @@ private:
     std::string DecodeAssign(entry ent);
 	std::string DecodeIntOp(entry ent);
 	std::string DecodeStrCmp(entry ent);
+	std::string DecodeCall(entry ent);
 	std::string DecodeNopJump(entry ent);
 	std::string DecodeExtractFile(entry ent);
 	std::string DecodeFileOperation(entry ent);
+	std::string DecodeIfFileExists(entry ent);
+	std::string DecodeExecute(entry ent);
+	std::string DecodeCallDllFunction(entry ent);
+	std::string DecodeStrLen(entry ent);
+	std::string DecodeSetFlag(entry ent);
+
+	std::string FormatFunction(int start);
 
     std::string GetNsisString(int offset);
 
@@ -105,9 +116,11 @@ private:
 	//	byte array to the stings
 	std::vector<WCHAR>	_nsis_string_table;
     std::vector<int>  _nsis_launguage_table;
+	
 
 	//	vector to nsis files (inclide uninstaller, plugins and installation files)
 	std::vector<sfile>  _nsis_files;
+	std::vector<int>	_nsis_function_entry;
 
 	//////////////////////////////////////////////////////////////////////////
 	//

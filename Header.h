@@ -184,8 +184,10 @@ enum
 	EW_EXECUTE,           // Execute program: 3,[complete command line,waitflag,>=0?output errorcode]
 	EW_GETFILETIME,       // GetFileTime; 3 [file highout lowout]
 	EW_GETDLLVERSION,     // GetDLLVersion: 3 [file highout lowout]
-	EW_GETFONTVERSION,     // GetFontVersion: 2 [file version]
-	EW_GETFONTNAME,     // GetFontName: 2 [file fontname]
+	
+	//EW_GETFONTVERSION,     // GetFontVersion: 2 [file version]
+	//EW_GETFONTNAME,     // GetFontName: 2 [file fontname]
+
 	EW_REGISTERDLL,       // Register DLL: 3,[DLL file name, string ptr of function to call, text to put in display (<0 if none/pass parms), 1 - no unload, 0 - unload]
 	EW_CREATESHORTCUT,    // Make Shortcut: 5, [link file, target file, parameters, icon file, iconindex|show mode<<8|hotkey<<16]
 	EW_COPYFILES,         // CopyFiles: 3 [source mask, destination location, flags]
@@ -208,7 +210,7 @@ enum
 	EW_FINDNEXT,          // FindNext: 2  [output, handle]
 	EW_FINDFIRST,         // FindFirst: 2 [filespec, output, handleoutput]
 	EW_WRITEUNINSTALLER,  // WriteUninstaller: 3 [name, offset, icon_size]
-	EW_LOG,               // LogText: 2 [0, text] / LogSet: [1, logstate]
+//	EW_LOG,               // LogText: 2 [0, text] / LogSet: [1, logstate]
 	EW_SECTIONSET,        // SectionSetText:    3: [idx, 0, text]
 	// SectionGetText:    3: [idx, 1, output]
 	// SectionSetFlags:   3: [idx, 2, flags]
@@ -222,3 +224,25 @@ enum
 	EW_LOCKWINDOW,
 	EW_FINDPROC,    // FindProc: 1 [process_name]
 };
+
+
+// extra_parameters data structures containing other interesting stuff
+// but the stack, variables and HWND passed on to plug-ins.
+typedef struct
+{
+	int autoclose;
+	int all_user_var;
+	int exec_error;
+	int abort;
+	int exec_reboot; // NSIS_SUPPORT_REBOOT
+	int reboot_called; // NSIS_SUPPORT_REBOOT
+	int XXX_cur_insttype; // depreacted
+	int plugin_api_version; // see NSISPIAPIVER_CURR
+	// used to be XXX_insttype_changed
+	int silent; // NSIS_CONFIG_SILENT_SUPPORT
+	int instdir_error;
+	int rtl;
+	int errlvl;
+	int alter_reg_view;
+	int status_update;
+} exec_flags_t;

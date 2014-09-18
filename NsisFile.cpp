@@ -377,6 +377,7 @@ bool	CNsisFile::ProcessingHeader()
 			}
 
 			ProcessingEntries();
+			ProcessingFunctions();
 
 			/*
 
@@ -422,6 +423,48 @@ bool CNsisFile::LoadEntries()
 	}
 	
 	return true;
+}
+
+/************************************************************************/
+//
+/************************************************************************/
+void CNsisFile::ProcessingFunctions()
+{
+	// function on Init
+	int entid = _globalheader.code_onInit;
+
+	if (entid > 0)
+	{
+		std::string str = "       Function OnInit \r\n" + _nsis_script_code[entid];
+		str.insert(30,"   ");
+		_nsis_script_code[entid] = str;
+		for (unsigned i = entid+1; i < _nsis_script_code.size();i++)
+		{
+			std::string var = _nsis_script_code[i];
+			int pos = var.find("return from function call");
+
+			if ( pos > 0)
+			{
+				break;
+			}
+			str = _nsis_script_code[i];
+			str.insert(5, "   ");
+			_nsis_script_code[i] = str;
+		}
+	}
+	std::string allcode;
+	for (unsigned  i= 0x00; i< _nsis_script_code.size(); i++)
+	{
+		allcode += _nsis_script_code[i];
+		allcode += "\r\n";
+	}
+
+
+	CFile file;
+	file.Open("D:\\ConduitInstaller\\spinstaller_s_exe\\code.txt",CFile::modeWrite|CFile::modeCreate,NULL);
+	file.Write(allcode.c_str(),allcode.size());
+	file.Close();
+
 }
 
 /************************************************************************/
@@ -578,7 +621,7 @@ std::string CNsisFile::GetNsisString(int offset)
 			real_offset++;
 			if (nVarIdx == NS_SHELL_CODE)
 			{
-				LPITEMIDLIST idl;
+				//LPITEMIDLIST idl;
 
 				int x = 2;
 				DWORD ver = GetVersion();
@@ -781,7 +824,7 @@ std::string CNsisFile::DecodeFileOperation(entry ent)
 			str = "FileClose " + _global_vars.GetVarName(ent.offsets[0]);
 		}
 		break;
-	case EW_FOPEN:
+	case EW_FOPEN: // FileOpen: 4  [name, openmode, createmode, outputhandle]
 		{
 			std::string handle = _global_vars.GetVarName(ent.offsets[0]);
 			std::string name = GetStringFromParm(ent,-0x13);
@@ -819,6 +862,93 @@ std::string CNsisFile::DecodeFileOperation(entry ent)
 	return str;
 }
 
+/************************************************************************/
+//
+/************************************************************************/
+std::string CNsisFile::DecodeCall(entry ent)
+{
+
+	int newent = ent.offsets[0];
+	char buff[0x10];
+
+	if (newent > 0 )
+	{
+		sprintf_s(buff,0x10,"Call %4.4i",ent.offsets[0]-1);
+	}
+	else
+	{
+		std::string str = _global_vars.GetVarName(-(newent+1));
+		sprintf_s(buff,0x10,"Call %s",str.c_str());
+		return buff;
+	}
+
+
+	for (unsigned i=0x00;i<_nsis_function_entry.size();i++)
+	{
+		if ((ent.offsets[0]-1) == _nsis_function_entry[i])
+		{
+			return buff;
+		}
+	}
+	_nsis_function_entry.push_back(ent.offsets[0]-1);
+
+	return buff;
+}
+
+/************************************************************************/
+//	
+/************************************************************************/
+std::string CNsisFile::DecodeIfFileExists(entry ent)
+{
+	//	"IfFileExists: 3, [file name, jump amount if exists, jump amount if not exists]"
+	char buff[0x100];
+	std::string  filename = GetNsisString(ent.offsets[0]);
+	sprintf_s(buff,0x100,"IfFileExists %s %4.4i %4.4i",filename.c_str(),ent.offsets[1],ent.offsets[2]);
+	return buff;
+}
+
+/************************************************************************/
+//	
+/************************************************************************/
+std::string CNsisFile::DecodeCallDllFunction(entry ent)
+{
+	// 
+	std::string str = "Call_Dll_Function " + GetNsisString(ent.offsets[0]) + ":" + GetNsisString(ent.offsets[1]);
+
+	std::string param =  GetNsisString(ent.offsets[2]);
+
+	return str;
+	// "Register DLL: 3,[DLL file name, string ptr of function to call, text to put in display (<0 if none/pass parms), 1 - no unload, 0 - unload]"
+}
+
+/************************************************************************/
+//	
+/************************************************************************/
+std::string CNsisFile::DecodeExecute(entry ent)
+{
+	//	"Execute program: 3,[complete command line,waitflag,>=0?output errorcode"
+	std::string str;
+	if (ent.offsets[2] == 0x0)
+	{
+		str = "Exec " + GetNsisString(ent.offsets[0]);
+	}
+	else
+	{
+		str = "ExecWait [" + GetNsisString(ent.offsets[0]) + "] " +_global_vars.GetVarName(ent.offsets[1]);
+	}
+	
+	return str;
+}
+
+/************************************************************************/
+//
+/************************************************************************/
+std::string CNsisFile::DecodeStrLen(entry ent)
+{
+	std::string str = "StrLen "  + _global_vars.GetVarName(ent.offsets[0]) + " " + GetNsisString(ent.offsets[1]);
+	return str;
+}
+
 std::string CNsisFile::EntryToString(entry ent)
 {
 	std::string str;
@@ -830,18 +960,18 @@ std::string CNsisFile::EntryToString(entry ent)
 		case EW_NOP:				str = DecodeNopJump(ent);break;
 		case EW_ABORT:				str = "Abort: 1 [status]";break;
 		case EW_QUIT:				str = "Quit: 0";break;
-		case EW_CALL:				str = "Call: 1 [new address+1]";break;
+		case EW_CALL:				str = DecodeCall(ent);break;
 		case EW_UPDATETEXT:			str = "Update status text: 2 [update str, ui_st_updateflag=?ui_st_updateflag:this]";break;
 		case EW_SLEEP:				str = "Sleep: 1 [sleep time in milliseconds]";break;
-		case EW_BRINGTOFRONT:		str = " BringToFront: 0";break;
+		case EW_BRINGTOFRONT:		str = "BringToFront: 0";break;
 		case EW_CHDETAILSVIEW:		str = "SetDetailsView: 2 [listaction,buttonaction]";break;
 		case EW_SETFILEATTRIBUTES:	str = "SetFileAttributes: 2 [filename, attributes]";break;
 		case EW_CREATEDIR:			str = "Create directory: 2, [path, ?update$INSTDIR]";break;
-		case EW_IFFILEEXISTS:		str = "IfFileExists: 3, [file name, jump amount if exists, jump amount if not exists]";break;
+		case EW_IFFILEEXISTS:		str = DecodeIfFileExists(ent);break;
 		case EW_SETFLAG:			str = "Sets a flag: 2 [id, data]";break;
 		case EW_IFFLAG:				str = "If a flag: 4 [on, off, id, new value mask]";break;
 		case EW_GETFLAG:			str = "Gets a flag: 2 [output, id]";break;
-		case EW_RENAME:				str = " Rename: 3 [old, new, rebootok]";break;
+		case EW_RENAME:				str = "Rename: 3 [old, new, rebootok]";break;
 		case EW_GETFULLPATHNAME:	str = "GetFullPathName: 2 [output, input, ?lfn:sfn]";break;
 		case EW_SEARCHPATH:			str = "SearchPath: 2 [output, filename]";break;
 		case EW_GETTEMPFILENAME:	str = "GetTempFileName: 2 [output, base_dir]";break;
@@ -849,7 +979,7 @@ std::string CNsisFile::EntryToString(entry ent)
 		case EW_DELETEFILE:			str = "Delete File: 2, [filename, rebootok]";break;
 		case EW_MESSAGEBOX:			str = "MessageBox: 5,[MB_flags,text,retv1:retv2,moveonretv1:moveonretv2]";break;
 		case EW_RMDIR:				str = "RMDir: 2 [path, recursiveflag]";break;
-		case EW_STRLEN:				str = " StrLen: 2 [output, input]";break;
+		case EW_STRLEN:				str = DecodeStrLen(ent);break;
 		case EW_ASSIGNVAR:			str = DecodeAssign(ent);break;
 		case EW_STRCMP:				str = DecodeStrCmp(ent);break;
 		case EW_READENVSTR:			str = "ReadEnvStr/ExpandEnvStrings: 3 [output, string_with_env_variables, IsRead]";break;
@@ -866,12 +996,12 @@ std::string CNsisFile::EntryToString(entry ent)
 		case EW_CREATEFONT:			str = "CreateFont:        5: [handle output, face name, height, weight, flags]";break;
 		case EW_SHOWWINDOW:			str = "ShowWindow:        2: [hwnd, show state]";break;
 		case EW_SHELLEXEC:			str = "ShellExecute program: 4, [shell action, complete commandline, parameters, showwindow]";break;
-		case EW_EXECUTE:			str = " Execute program: 3,[complete command line,waitflag,>=0?output errorcode";break;
+		case EW_EXECUTE:			str = DecodeExecute(ent);break;
 		case EW_GETFILETIME:		str = "GetFileTime; 3 [file highout lowout]";break;
 		case EW_GETDLLVERSION:		str = "GetDLLVersion: 3 [file highout lowout]";break;
-		case EW_GETFONTVERSION:		str = "GetFontVersion: 2 [file version]";break;
-		case EW_GETFONTNAME:		str = "GetFontName: 2 [file fontname]";break;
-		case EW_REGISTERDLL:		str = "Register DLL: 3,[DLL file name, string ptr of function to call, text to put in display (<0 if none/pass parms), 1 - no unload, 0 - unload]";break;
+	//	case EW_GETFONTVERSION:		str = "GetFontVersion: 2 [file version]";break;
+	//	case EW_GETFONTNAME:		str = "GetFontName: 2 [file fontname]";break;
+		case EW_REGISTERDLL:		str = DecodeCallDllFunction(ent);break;
 		case EW_CREATESHORTCUT:		str = "Make Shortcut: 5, [link file, target file, parameters, icon file, iconindex|show mode<<8|hotkey<<16]";break;
 		case EW_COPYFILES:			str = "CopyFiles: 3 [source mask, destination location, flags]";break;
 		case EW_REBOOT:				str = "Reboot: 0";break;
@@ -889,10 +1019,10 @@ std::string CNsisFile::EntryToString(entry ent)
 		case EW_FGETWS:				str = DecodeFileOperation(ent);break;
 		case EW_FSEEK:				str = DecodeFileOperation(ent);break;
 		case EW_FINDCLOSE:			str = "FindClose: 1 [handle]";break;
-		case EW_FINDNEXT:			str = " FindNext: 2  [output, handle]";break;
+		case EW_FINDNEXT:			str = "FindNext: 2  [output, handle]";break;
 		case EW_FINDFIRST:			str = "FindFirst: 2 [filespec, output, handleoutput]";break;
 		case EW_WRITEUNINSTALLER:	str = "WriteUninstaller: 3 [name, offset, icon_size]";break;
-		case EW_LOG:				str = "LogText: 2 [0, text] / LogSet: [1, logstate]";break;
+	//	case EW_LOG:				str = "LogText: 2 [0, text] / LogSet: [1, logstate]";break;
 		case EW_SECTIONSET:			str = "SectionSetText:    3: [idx, 0, text] / SectionGetText:    3: [idx, 1, output] / SectionSetFlags:   3: [idx, 2, flags] /  SectionGetFlags:   3: [idx, 3, output] / InstTypeGetFlags:  3: [idx, 1, output]";break;
 		case EW_GETLABELADDR:		str = "both of these get converted to EW_ASSIGNVAR";break;
 		case EW_GETFUNCTIONADDR:	str = "both of these get converted to EW_ASSIGNVAR";break;
@@ -910,7 +1040,7 @@ std::string CNsisFile::EntryToString(entry ent)
 /************************************************************************/
 void CNsisFile::ProcessingEntries()
 {
-	std::string all;
+	
 	char buff[0x10];
 	for (unsigned i = 0x00;i<_nsis_entry.size(); i++ )
 	{
@@ -919,9 +1049,5 @@ void CNsisFile::ProcessingEntries()
 		std::string str = buff;
 		str += EntryToString(ent);
 		_nsis_script_code.push_back(str);
-		all += str;
-		all += "\r\n";
 	}
-
-
 }
