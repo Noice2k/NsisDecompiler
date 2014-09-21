@@ -788,6 +788,7 @@ std::string CNsisFile::DecodeNopJump(entry ent)
 	return buff;
 }
 
+
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
@@ -817,6 +818,8 @@ std::string CNsisFile::DecodeExtractFile(entry ent)
 std::string CNsisFile::DecodeFileOperation(entry ent)
 {
 	std::string str ;
+	std::string handle = _global_vars.GetVarName(ent.offsets[0]);
+	
 	switch (ent.which)
 	{
 	case EW_FCLOSE:
@@ -826,7 +829,6 @@ std::string CNsisFile::DecodeFileOperation(entry ent)
 		break;
 	case EW_FOPEN: // FileOpen: 4  [name, openmode, createmode, outputhandle]
 		{
-			std::string handle = _global_vars.GetVarName(ent.offsets[0]);
 			std::string name = GetStringFromParm(ent,-0x13);
 			std::string mode = GetNsisString(ent.offsets[2]); 
 			str = "FileOpen " + handle + " " + name ; 
@@ -836,18 +838,34 @@ std::string CNsisFile::DecodeFileOperation(entry ent)
 			str = "FileWrite: 3 [handle, string, ?int:string]";break;
 		break;
 	case EW_FGETS:
-			str = "FileRead: 4  [handle, output, maxlen, ?getchar:gets]";break;
+		{
+			std::string out = _global_vars.GetVarName(ent.offsets[1]);
+			std::string maxlen = GetNsisString(ent.offsets[2]);
+			if (1 == ent.offsets[3])
+			{
+				str = "FileReadByteA " + handle + " " + out;
+			}
+			else
+			{
+				str = "FileReadA " + handle + " " + out;
+			}
+		}	
 		break;
 	case EW_FPUTWS:
 			str = "FileWriteUTF16LE: 3 [handle, string, ?int:string]";break;
 		break;
 	case EW_FGETWS:
 		{
-			std::string handle	= _global_vars.GetVarName(ent.offsets[0]);
-			std::string out		= _global_vars.GetVarName(ent.offsets[1]);
-			std::string maxlen	= GetNsisString(ent.offsets[0]);
-
-			str = "FileReadUTF16LE: 4 [handle, output, maxlen, ?getchar:gets]";
+			std::string out = _global_vars.GetVarName(ent.offsets[1]);
+			std::string maxlen = GetNsisString(ent.offsets[2]);
+			if (0 == ent.offsets[3])
+			{
+				str = "FileReadByteW " + handle + " " + out;
+			}
+			else
+			{
+				str = "FileReadW " + handle + " " + out;
+			}
 		}break;
 	case EW_FSEEK:
 		{
@@ -949,6 +967,58 @@ std::string CNsisFile::DecodeStrLen(entry ent)
 	return str;
 }
 
+/************************************************************************/
+//
+/************************************************************************/
+std::string CNsisFile::DecodeSetFlag(entry ent)
+{
+	std::string str;
+	switch (ent.offsets[0])
+	{
+	case 0x00: str = "SetFlag AutoClose " + GetNsisString(ent.offsets[1]); break;
+	case 0x01: str = "SetFlag all_user_var " + GetNsisString(ent.offsets[1]); break;
+	case 0x02: str = "SetFlag exec_error " + GetNsisString(ent.offsets[1]); 	break;
+	case 0x03: str = "SetFlag AutoClose " + GetNsisString(ent.offsets[1]); break;
+	case 0x04: str = "SetFlag ExecReboot " + GetNsisString(ent.offsets[1]);break;
+	case 0x05: str = "SetFlag RebootCalled " + GetNsisString(ent.offsets[1]);break;
+	case 0x06: str = "SetFlag depricated " + GetNsisString(ent.offsets[1]);break;
+	case 0x07: str = "SetFlag Plugin_api_version " + GetNsisString(ent.offsets[1]);break;
+	case 0x08: str = "SetFlag Silent " + GetNsisString(ent.offsets[1]);break;
+	case 0x09: str = "SetFlag instdir_error " + GetNsisString(ent.offsets[1]);break;
+	case 0x0A: str = "SetFlag rtl " + GetNsisString(ent.offsets[1]);break;
+	case 0x0B: str = "SetFlag errlevel " + GetNsisString(ent.offsets[1]);break;
+	case 0x0C: str = "SetFlag alter_reg_view " + GetNsisString(ent.offsets[1]);break;
+	case 0x0D: str = "SetFlag status_update " + GetNsisString(ent.offsets[1]);break;
+
+	default:
+			str = "SetFlag __unknow_flag";
+		break; 
+	}
+	return str;
+}
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+std::string CNsisFile::DecodeIntCmp(entry ent)
+{
+	// "IntCmp: 6 [val1, val2, equal, val1<val2, val1>val2, unsigned?]"
+	std::string var1 = GetStringFromParm(ent,0x20);
+	std::string var2 = GetStringFromParm(ent,0x31);
+	std::string str = "IntCmp " + var1 + " " + var2;
+	int off2 = ent.offsets[2] == 0 ? 0 : ent.offsets[2] - 1;
+	int off3 = ent.offsets[3] == 0 ? 0 : ent.offsets[3] - 1;
+	int off4 = ent.offsets[4] == 0 ? 0 : ent.offsets[4] - 1;
+
+	char buff[0x10];
+	sprintf_s(buff,0x10," %4.4i %4.4i %4.4i",off2,off3,off4);
+	str += buff;
+
+	return str;
+}
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
 std::string CNsisFile::EntryToString(entry ent)
 {
 	std::string str;
@@ -968,7 +1038,7 @@ std::string CNsisFile::EntryToString(entry ent)
 		case EW_SETFILEATTRIBUTES:	str = "SetFileAttributes: 2 [filename, attributes]";break;
 		case EW_CREATEDIR:			str = "Create directory: 2, [path, ?update$INSTDIR]";break;
 		case EW_IFFILEEXISTS:		str = DecodeIfFileExists(ent);break;
-		case EW_SETFLAG:			str = "Sets a flag: 2 [id, data]";break;
+		case EW_SETFLAG:			str = DecodeSetFlag(ent);break;
 		case EW_IFFLAG:				str = "If a flag: 4 [on, off, id, new value mask]";break;
 		case EW_GETFLAG:			str = "Gets a flag: 2 [output, id]";break;
 		case EW_RENAME:				str = "Rename: 3 [old, new, rebootok]";break;
@@ -983,7 +1053,7 @@ std::string CNsisFile::EntryToString(entry ent)
 		case EW_ASSIGNVAR:			str = DecodeAssign(ent);break;
 		case EW_STRCMP:				str = DecodeStrCmp(ent);break;
 		case EW_READENVSTR:			str = "ReadEnvStr/ExpandEnvStrings: 3 [output, string_with_env_variables, IsRead]";break;
-		case EW_INTCMP:				str = "IntCmp: 6 [val1, val2, equal, val1<val2, val1>val2, unsigned?]";break;
+		case EW_INTCMP:				str = DecodeIntCmp(ent);break;
 		case EW_INTOP:				str = DecodeIntOp(ent);break;
 		case EW_INTFMT:				str = "IntFmt: [output, format, input]";break;
 		case EW_PUSHPOP:			str = DecodePushPop(ent);break;

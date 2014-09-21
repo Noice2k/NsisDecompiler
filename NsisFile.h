@@ -95,6 +95,7 @@ private:
 	std::string DecodeCallDllFunction(entry ent);
 	std::string DecodeStrLen(entry ent);
 	std::string DecodeSetFlag(entry ent);
+	std::string DecodeIntCmp(entry ent);
 
 	std::string FormatFunction(int start);
 
