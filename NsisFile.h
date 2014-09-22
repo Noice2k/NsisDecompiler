@@ -78,6 +78,7 @@ private:
 	void ProcessingEntries();
 
 	void ProcessingFunctions();
+	void FunctionFormatText(int entstart,std::string functiontype,  std::string  name);
 
 	std::string EntryToString(entry ent);
 
@@ -96,11 +97,17 @@ private:
 	std::string DecodeStrLen(entry ent);
 	std::string DecodeSetFlag(entry ent);
 	std::string DecodeIntCmp(entry ent);
-
+	std::string DecodeIntFmt(entry ent);
+	std::string DecodeFindFiles(entry ent);
+	std::string DecodeIfFlag(entry ent);
+	std::string DecodeReadRegStr(entry ent);
+	std::string DecodeCreateDir(entry ent);
+	std::string DecodeDeleteFile(entry ent);
+	std::string DecodeSleep(entry ent);
+	std::string DecodeGetTempFileName(entry ent);
+	std::string DecodeMessageBox(entry ent);
 	std::string FormatFunction(int start);
-
     std::string GetNsisString(int offset);
-
 	std::string GetStringFromParm(entry ent,int id);
 
 	//	install pages
@@ -117,7 +124,6 @@ private:
 	//	byte array to the stings
 	std::vector<WCHAR>	_nsis_string_table;
     std::vector<int>  _nsis_launguage_table;
-	
 
 	//	vector to nsis files (inclide uninstaller, plugins and installation files)
 	std::vector<sfile>  _nsis_files;

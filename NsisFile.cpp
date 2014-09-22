@@ -421,8 +421,34 @@ bool CNsisFile::LoadEntries()
 		entry en = *(entry*)&_header_dump[i*sizeof(entry)+offset];
 		_nsis_entry.push_back(en);
 	}
-	
 	return true;
+}
+
+/************************************************************************/
+//
+/************************************************************************/
+void CNsisFile::FunctionFormatText(int entstart,std::string functiontype, std::string name)
+{
+
+	std::string str = "       "+functiontype+" "+ name + "\r\n";
+	int stroff = str.size();
+	str += _nsis_script_code[entstart];
+	str.insert(stroff+5,"   ");
+	_nsis_script_code[entstart] = str;
+	for (unsigned i = entstart+1; i < _nsis_script_code.size();i++)
+	{
+		std::string var = _nsis_script_code[i];
+		int pos = var.find("return from function call");
+
+		if ( pos > 0)
+		{
+			break;
+		}
+		str = _nsis_script_code[i];
+		str.insert(5, "   ");
+		_nsis_script_code[i] = str;
+	}
+
 }
 
 /************************************************************************/
@@ -431,40 +457,42 @@ bool CNsisFile::LoadEntries()
 void CNsisFile::ProcessingFunctions()
 {
 	// function on Init
-	int entid = _globalheader.code_onInit;
-
-	if (entid > 0)
+	if (_globalheader.code_onInit >= 0)
 	{
-		std::string str = "       Function OnInit \r\n" + _nsis_script_code[entid];
-		str.insert(30,"   ");
-		_nsis_script_code[entid] = str;
-		for (unsigned i = entid+1; i < _nsis_script_code.size();i++)
+		FunctionFormatText(_globalheader.code_onInit,"Function","OnInit");
+	}
+	for (unsigned i = 0x00; i<_nsis_section.size();i++)
+	{
+		section s = _nsis_section[i];
+		if (s.code > 0)
 		{
-			std::string var = _nsis_script_code[i];
-			int pos = var.find("return from function call");
-
-			if ( pos > 0)
-			{
-				break;
-			}
-			str = _nsis_script_code[i];
-			str.insert(5, "   ");
-			_nsis_script_code[i] = str;
+			FunctionFormatText(s.code,"Section",GetNsisString(s.name_ptr));
 		}
 	}
+
+	char buff[0x100];
+	for ( unsigned i= 0;  i< _nsis_function_entry.size(); i++)
+	{
+		sprintf_s(buff,0x100,"function%4.4i",_nsis_function_entry[i]);
+		FunctionFormatText(_nsis_function_entry[i],"Function",buff);
+	}
+
 	std::string allcode;
 	for (unsigned  i= 0x00; i< _nsis_script_code.size(); i++)
 	{
-		allcode += _nsis_script_code[i];
-		allcode += "\r\n";
+		if (_nsis_script_code[i].size() > 8)
+		{
+			allcode += _nsis_script_code[i];
+			allcode += "\r\n";
+		}
 	}
+
 
 
 	CFile file;
 	file.Open("D:\\ConduitInstaller\\spinstaller_s_exe\\code.txt",CFile::modeWrite|CFile::modeCreate,NULL);
 	file.Write(allcode.c_str(),allcode.size());
 	file.Close();
-
 }
 
 /************************************************************************/
@@ -887,16 +915,16 @@ std::string CNsisFile::DecodeCall(entry ent)
 {
 
 	int newent = ent.offsets[0];
-	char buff[0x10];
+	char buff[0x100];
 
 	if (newent > 0 )
 	{
-		sprintf_s(buff,0x10,"Call %4.4i",ent.offsets[0]-1);
+		sprintf_s(buff,0x100,"Call Function%4.4i",ent.offsets[0]-1);
 	}
 	else
 	{
 		std::string str = _global_vars.GetVarName(-(newent+1));
-		sprintf_s(buff,0x10,"Call %s",str.c_str());
+		sprintf_s(buff,0x100,"Call %s",str.c_str());
 		return buff;
 	}
 
@@ -935,6 +963,10 @@ std::string CNsisFile::DecodeCallDllFunction(entry ent)
 
 	std::string param =  GetNsisString(ent.offsets[2]);
 
+	if (ent.offsets[4] == 0)
+	{
+		int o=0;
+	}
 	return str;
 	// "Register DLL: 3,[DLL file name, string ptr of function to call, text to put in display (<0 if none/pass parms), 1 - no unload, 0 - unload]"
 }
@@ -970,6 +1002,23 @@ std::string CNsisFile::DecodeStrLen(entry ent)
 /************************************************************************/
 //
 /************************************************************************/
+std::string CNsisFile::DecodeIfFlag(entry ent)
+{
+	char buff[0x100];	
+	//	"!If a flag: 4 [on, off, id, new value mask]"
+	if (ent.offsets[2] == 2) // exec_error
+	{
+		sprintf_s(buff,0x100,"if_exec_error == 1 goto %4.4i else goto %4.4i",ent.offsets[0],ent.offsets[1]);
+	}
+	else
+	{
+		sprintf_s(buff,0x100,"unkow if_flag");
+	}
+	return buff;
+}
+/************************************************************************/
+//
+/************************************************************************/
 std::string CNsisFile::DecodeSetFlag(entry ent)
 {
 	std::string str;
@@ -978,7 +1027,7 @@ std::string CNsisFile::DecodeSetFlag(entry ent)
 	case 0x00: str = "SetFlag AutoClose " + GetNsisString(ent.offsets[1]); break;
 	case 0x01: str = "SetFlag all_user_var " + GetNsisString(ent.offsets[1]); break;
 	case 0x02: str = "SetFlag exec_error " + GetNsisString(ent.offsets[1]); 	break;
-	case 0x03: str = "SetFlag AutoClose " + GetNsisString(ent.offsets[1]); break;
+	case 0x03: str = "SetFlag abort " + GetNsisString(ent.offsets[1]); break;
 	case 0x04: str = "SetFlag ExecReboot " + GetNsisString(ent.offsets[1]);break;
 	case 0x05: str = "SetFlag RebootCalled " + GetNsisString(ent.offsets[1]);break;
 	case 0x06: str = "SetFlag depricated " + GetNsisString(ent.offsets[1]);break;
@@ -1016,9 +1065,200 @@ std::string CNsisFile::DecodeIntCmp(entry ent)
 
 	return str;
 }
+
+/************************************************************************/
+//
+/************************************************************************/
+std::string CNsisFile::DecodeIntFmt(entry ent)
+{
+	char buff[0x1000];
+	std::string str = GetNsisString(ent.offsets[1]);
+	sprintf_s(buff,0x1000,"IntFmt %s %s %i",_global_vars.GetVarName(ent.offsets[0]).c_str(),str.c_str(),ent.offsets[2]);
+	
+	return buff;
+}
+
+/************************************************************************/
+//
+/************************************************************************/
+std::string CNsisFile::DecodeFindFiles(entry ent)
+{
+	std::string str;
+	if (ent.which == EW_FINDFIRST)
+	{
+		//"!FindFirst: 2 [filespec, output, handleoutput]"
+		std::string output = _global_vars.GetVarName(ent.offsets[0]);
+		std::string handle = _global_vars.GetVarName(ent.offsets[1]);
+		std::string filespec = GetNsisString(ent.offsets[2]);
+		str = "FindFirst " + handle + " " + output + " " + filespec;
+	}
+	if (ent.which == EW_FINDCLOSE)
+	{
+		//	"!FindClose: 1 [handle]"
+		std::string handle = _global_vars.GetVarName(ent.offsets[0]);
+		str = "FindClose " + handle;
+	}
+	if (ent.which == EW_FINDNEXT)
+	{
+		// "!FindNext: 2  [output, handle]"
+		std::string output = _global_vars.GetVarName(ent.offsets[0]);
+		std::string handle = _global_vars.GetVarName(ent.offsets[1]);
+		str = "FindNext " + handle + " " + output;
+	}
+	return str;
+}
+
+const TCHAR * _RegKeyHandleToName(HKEY hKey)
+{
+	if (hKey == HKEY_CLASSES_ROOT)
+		return _T("HKEY_CLASSES_ROOT");
+	else if (hKey == HKEY_CURRENT_USER)
+		return _T("HKEY_CURRENT_USER");
+	else if (hKey == HKEY_LOCAL_MACHINE)
+		return _T("HKEY_LOCAL_MACHINE");
+	else if (hKey == HKEY_USERS)
+		return _T("HKEY_USERS");
+	else if (hKey == HKEY_PERFORMANCE_DATA)
+		return _T("HKEY_PERFORMANCE_DATA");
+	else if (hKey == HKEY_CURRENT_CONFIG)
+		return _T("HKEY_CURRENT_CONFIG");
+	else if (hKey == HKEY_DYN_DATA)
+		return _T("HKEY_DYN_DATA");
+	else
+		return _T("invalid registry key");
+}
+
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
+std::string CNsisFile::DecodeReadRegStr(entry ent)
+{
+	//	"!ReadRegStr: 5 [output, rootkey(int), keyname, itemname, ==1?int::str]"
+	std::string var  = _global_vars.GetVarName(ent.offsets[0]);
+	std::string root = _RegKeyHandleToName((HKEY)ent.offsets[1]);
+	std::string path = GetNsisString(ent.offsets[2]);
+	std::string key  = GetNsisString(ent.offsets[3]);
+	std::string str ;
+	if (1 == ent.offsets[4])
+	{
+		str = "ReadRegDWORD " + var + " " + root + " " + path + " " + key;
+	}
+	else
+	{
+		str = "ReadRegStr " + var + " " + root + " " + path + " " + key;
+	}
+	return str;	
+}
+
+/************************************************************************/
+//	
+/************************************************************************/
+std::string CNsisFile::DecodeCreateDir(entry ent)
+{
+	std::string  path = "CreateDirectory "+ GetNsisString(ent.offsets[0]);
+	if (ent.offsets[1])
+	{
+		path += " ; Set_as_default";
+	}
+	//	"!Create directory: 2, [path, ?update$INSTDIR]"
+	return path;
+}
+
+/************************************************************************/
+//
+/************************************************************************/
+std::string CNsisFile::DecodeDeleteFile(entry ent)
+{
+	std::string str = "Delete " +  GetNsisString(ent.offsets[0]) + " ;";
+	str+= ent.offsets[1] & 0x01 ? "DEL_DIR | " : "";
+	str+= ent.offsets[1] & 0x02 ? "DEL_RECURSE | " : "";
+	str+= ent.offsets[1] & 0x04 ? "DEL_REBOOT | " : "";
+	str+= ent.offsets[1] & 0x08 ? "DEL_SIMPLE | " : "";
+	/*
+	"!Delete File: 2, [filename, rebootok]"
+#define DEL_DIR 1
+#define DEL_RECURSE 2
+#define DEL_REBOOT 4
+#define DEL_SIMPLE 8
+
+	*/
+	return str;
+}
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+std::string CNsisFile::DecodeSleep(entry ent)
+{
+	char buff[0x100];
+	//	"!Sleep: 1 [sleep time in milliseconds]"
+	sprintf_s(buff,0x100,"Sleep %i",ent.offsets[0]);
+	return buff;
+}
+
+/************************************************************************/
+//	
+/************************************************************************/
+std::string CNsisFile::DecodeGetTempFileName(entry ent)
+{
+	std::string str = "GetTempFileName " + _global_vars.GetVarName(ent.offsets[0]) + " " +  GetNsisString(ent.offsets[1]);
+	//	"!GetTempFileName: 2 [output, base_dir]"
+	return str;
+}
+
+/************************************************************************/
+//
+/************************************************************************/
+std::string CNsisFile::DecodeMessageBox(entry ent)
+{
+
+	#define MBD(x) {x,_T(#x)},
+	struct
+	{
+		int id;
+		const TCHAR *str;
+	} list[]=
+	{
+		MBD(MB_ABORTRETRYIGNORE)
+		MBD(MB_OK)
+		MBD(MB_OKCANCEL)
+		MBD(MB_RETRYCANCEL)
+		MBD(MB_YESNO)
+		MBD(MB_YESNOCANCEL)
+		MBD(MB_ICONEXCLAMATION)
+		MBD(MB_ICONINFORMATION)
+		MBD(MB_ICONQUESTION)
+		MBD(MB_ICONSTOP)
+		MBD(MB_USERICON)
+		MBD(MB_TOPMOST)
+		MBD(MB_SETFOREGROUND)
+		MBD(MB_RIGHT)
+		MBD(MB_RTLREADING)
+		MBD(MB_DEFBUTTON1)
+		MBD(MB_DEFBUTTON2)
+		MBD(MB_DEFBUTTON3)
+		MBD(MB_DEFBUTTON4)
+	};
+
+	std::string flags = "";
+	for (unsigned i = 0x00; i<19; i++)
+	{
+		if ((ent.offsets[0] & list[i].id) == list[i].id)			
+		{
+			flags += flags.empty() ? "" : "|";
+			flags += list[i].str;
+		}
+	}
+
+	//"!MessageBox: 5,[MB_flags,text,retv1:retv2,moveonretv1:moveonretv2]"
+	std::string str = "MessageBox " + flags  + "\""+ GetNsisString(ent.offsets[1]); 
+	char buff[0x100];
+	sprintf_s(buff,0x100,"\" %4.4i %4.4i", ent.offsets[3],ent.offsets[5]);
+	str += buff;
+	//	"!GetTempFileName: 2 [output, base_dir]"
+	return str;
+}
+
 std::string CNsisFile::EntryToString(entry ent)
 {
 	std::string str;
@@ -1031,56 +1271,56 @@ std::string CNsisFile::EntryToString(entry ent)
 		case EW_ABORT:				str = "Abort: 1 [status]";break;
 		case EW_QUIT:				str = "Quit: 0";break;
 		case EW_CALL:				str = DecodeCall(ent);break;
-		case EW_UPDATETEXT:			str = "Update status text: 2 [update str, ui_st_updateflag=?ui_st_updateflag:this]";break;
-		case EW_SLEEP:				str = "Sleep: 1 [sleep time in milliseconds]";break;
-		case EW_BRINGTOFRONT:		str = "BringToFront: 0";break;
-		case EW_CHDETAILSVIEW:		str = "SetDetailsView: 2 [listaction,buttonaction]";break;
-		case EW_SETFILEATTRIBUTES:	str = "SetFileAttributes: 2 [filename, attributes]";break;
-		case EW_CREATEDIR:			str = "Create directory: 2, [path, ?update$INSTDIR]";break;
+		case EW_UPDATETEXT:			str = "!Update status text: 2 [update str, ui_st_updateflag=?ui_st_updateflag:this]";break;
+		case EW_SLEEP:				str = DecodeSleep(ent);break;
+		case EW_BRINGTOFRONT:		str = "!BringToFront: 0";break;
+		case EW_CHDETAILSVIEW:		str = "!SetDetailsView: 2 [listaction,buttonaction]";break;
+		case EW_SETFILEATTRIBUTES:	str = "!SetFileAttributes: 2 [filename, attributes]";break;
+		case EW_CREATEDIR:			str = DecodeCreateDir(ent);break;
 		case EW_IFFILEEXISTS:		str = DecodeIfFileExists(ent);break;
 		case EW_SETFLAG:			str = DecodeSetFlag(ent);break;
-		case EW_IFFLAG:				str = "If a flag: 4 [on, off, id, new value mask]";break;
-		case EW_GETFLAG:			str = "Gets a flag: 2 [output, id]";break;
-		case EW_RENAME:				str = "Rename: 3 [old, new, rebootok]";break;
-		case EW_GETFULLPATHNAME:	str = "GetFullPathName: 2 [output, input, ?lfn:sfn]";break;
-		case EW_SEARCHPATH:			str = "SearchPath: 2 [output, filename]";break;
-		case EW_GETTEMPFILENAME:	str = "GetTempFileName: 2 [output, base_dir]";break;
+		case EW_IFFLAG:				str = DecodeIfFlag(ent);break;
+		case EW_GETFLAG:			str = "!Gets a flag: 2 [output, id]";break;
+		case EW_RENAME:				str = "!Rename: 3 [old, new, rebootok]";break;
+		case EW_GETFULLPATHNAME:	str = "!GetFullPathName: 2 [output, input, ?lfn:sfn]";break;
+		case EW_SEARCHPATH:			str = "!SearchPath: 2 [output, filename]";break;
+		case EW_GETTEMPFILENAME:	str = DecodeGetTempFileName(ent);break;
 		case EW_EXTRACTFILE:		str = DecodeExtractFile(ent);break;
-		case EW_DELETEFILE:			str = "Delete File: 2, [filename, rebootok]";break;
-		case EW_MESSAGEBOX:			str = "MessageBox: 5,[MB_flags,text,retv1:retv2,moveonretv1:moveonretv2]";break;
-		case EW_RMDIR:				str = "RMDir: 2 [path, recursiveflag]";break;
+		case EW_DELETEFILE:			str =  DecodeDeleteFile(ent);break;
+		case EW_MESSAGEBOX:			str = DecodeMessageBox(ent);break;
+		case EW_RMDIR:				str = "!RMDir: 2 [path, recursiveflag]";break;
 		case EW_STRLEN:				str = DecodeStrLen(ent);break;
 		case EW_ASSIGNVAR:			str = DecodeAssign(ent);break;
 		case EW_STRCMP:				str = DecodeStrCmp(ent);break;
-		case EW_READENVSTR:			str = "ReadEnvStr/ExpandEnvStrings: 3 [output, string_with_env_variables, IsRead]";break;
+		case EW_READENVSTR:			str = "!ReadEnvStr/ExpandEnvStrings: 3 [output, string_with_env_variables, IsRead]";break;
 		case EW_INTCMP:				str = DecodeIntCmp(ent);break;
 		case EW_INTOP:				str = DecodeIntOp(ent);break;
-		case EW_INTFMT:				str = "IntFmt: [output, format, input]";break;
+		case EW_INTFMT:				str = DecodeIntFmt(ent);break;
 		case EW_PUSHPOP:			str = DecodePushPop(ent);break;
-		case EW_FINDWINDOW:			str = "FindWindow: 5, [outputvar, window class,window name, window_parent, window_after]";break;
-		case EW_SENDMESSAGE:		str = "SendMessage: 6 [output, hwnd, msg, wparam, lparam, [wparamstring?1:0 | lparamstring?2:0 | timeout<<2]";break;
-		case EW_ISWINDOW:			str = "IsWindow: 3 [hwnd, jump_if_window, jump_if_notwindow]";break;
-		case EW_GETDLGITEM:			str = "GetDlgItem:        3: [outputvar, dialog, item_id]";break;
-		case EW_SETCTLCOLORS:		str = "SerCtlColors:      3: [hwnd, pointer to struct colors]";break;
-		case EW_SETBRANDINGIMAGE:	str = "SetBrandingImage:  1: [Bitmap file]";break;
-		case EW_CREATEFONT:			str = "CreateFont:        5: [handle output, face name, height, weight, flags]";break;
-		case EW_SHOWWINDOW:			str = "ShowWindow:        2: [hwnd, show state]";break;
-		case EW_SHELLEXEC:			str = "ShellExecute program: 4, [shell action, complete commandline, parameters, showwindow]";break;
+		case EW_FINDWINDOW:			str = "!FindWindow: 5, [outputvar, window class,window name, window_parent, window_after]";break;
+		case EW_SENDMESSAGE:		str = "!SendMessage: 6 [output, hwnd, msg, wparam, lparam, [wparamstring?1:0 | lparamstring?2:0 | timeout<<2]";break;
+		case EW_ISWINDOW:			str = "!IsWindow: 3 [hwnd, jump_if_window, jump_if_notwindow]";break;
+		case EW_GETDLGITEM:			str = "!GetDlgItem:        3: [outputvar, dialog, item_id]";break;
+		case EW_SETCTLCOLORS:		str = "!SerCtlColors:      3: [hwnd, pointer to struct colors]";break;
+		case EW_SETBRANDINGIMAGE:	str = "!SetBrandingImage:  1: [Bitmap file]";break;
+		case EW_CREATEFONT:			str = "!CreateFont:        5: [handle output, face name, height, weight, flags]";break;
+		case EW_SHOWWINDOW:			str = "!ShowWindow:        2: [hwnd, show state]";break;
+		case EW_SHELLEXEC:			str = "!ShellExecute program: 4, [shell action, complete commandline, parameters, showwindow]";break;
 		case EW_EXECUTE:			str = DecodeExecute(ent);break;
-		case EW_GETFILETIME:		str = "GetFileTime; 3 [file highout lowout]";break;
-		case EW_GETDLLVERSION:		str = "GetDLLVersion: 3 [file highout lowout]";break;
+		case EW_GETFILETIME:		str = "!GetFileTime; 3 [file highout lowout]";break;
+		case EW_GETDLLVERSION:		str = "!GetDLLVersion: 3 [file highout lowout]";break;
 	//	case EW_GETFONTVERSION:		str = "GetFontVersion: 2 [file version]";break;
 	//	case EW_GETFONTNAME:		str = "GetFontName: 2 [file fontname]";break;
 		case EW_REGISTERDLL:		str = DecodeCallDllFunction(ent);break;
-		case EW_CREATESHORTCUT:		str = "Make Shortcut: 5, [link file, target file, parameters, icon file, iconindex|show mode<<8|hotkey<<16]";break;
+		case EW_CREATESHORTCUT:		str = "!Make Shortcut: 5, [link file, target file, parameters, icon file, iconindex|show mode<<8|hotkey<<16]";break;
 		case EW_COPYFILES:			str = "CopyFiles: 3 [source mask, destination location, flags]";break;
-		case EW_REBOOT:				str = "Reboot: 0";break;
-		case EW_WRITEINI:			str = "Write INI String: 4, [Section, Name, Value, INI File]";break;
-		case EW_READINISTR:			str = "ReadINIStr: 4 [output, section, name, ini_file";break;
-		case EW_DELREG:				str = "DeleteRegValue/DeleteRegKey: 4, [root key(int), KeyName, ValueName, delkeyonlyifempty]. ValueName is -1 if delete key";break;
-		case EW_WRITEREG:			str = "Write Registry value: 5, [RootKey(int),KeyName,ItemName,ItemData,typelen]  typelen=1 for str, 2 for dword, 3 for binary, 0 for expanded str";break;
-		case EW_READREGSTR:			str = "ReadRegStr: 5 [output, rootkey(int), keyname, itemname, ==1?int::str]";break;
-		case EW_REGENUM:			str = "RegEnum: 5 [output, rootkey, keyname, index, ?key:value]";break;
+		case EW_REBOOT:				str = "!Reboot: 0";break;
+		case EW_WRITEINI:			str = "!Write INI String: 4, [Section, Name, Value, INI File]";break;
+		case EW_READINISTR:			str = "!ReadINIStr: 4 [output, section, name, ini_file";break;
+		case EW_DELREG:				str = "!DeleteRegValue/DeleteRegKey: 4, [root key(int), KeyName, ValueName, delkeyonlyifempty]. ValueName is -1 if delete key";break;
+		case EW_WRITEREG:			str = "!Write Registry value: 5, [RootKey(int),KeyName,ItemName,ItemData,typelen]  typelen=1 for str, 2 for dword, 3 for binary, 0 for expanded str";break;
+		case EW_READREGSTR:			str = DecodeReadRegStr(ent);;break;
+		case EW_REGENUM:			str = "!RegEnum: 5 [output, rootkey, keyname, index, ?key:value]";break;
 		case EW_FCLOSE:				str = DecodeFileOperation(ent);break;
 		case EW_FOPEN:				str = DecodeFileOperation(ent);break;
 		case EW_FPUTS:				str = DecodeFileOperation(ent);break;
@@ -1088,16 +1328,16 @@ std::string CNsisFile::EntryToString(entry ent)
 		case EW_FPUTWS:				str = DecodeFileOperation(ent);break;
 		case EW_FGETWS:				str = DecodeFileOperation(ent);break;
 		case EW_FSEEK:				str = DecodeFileOperation(ent);break;
-		case EW_FINDCLOSE:			str = "FindClose: 1 [handle]";break;
-		case EW_FINDNEXT:			str = "FindNext: 2  [output, handle]";break;
-		case EW_FINDFIRST:			str = "FindFirst: 2 [filespec, output, handleoutput]";break;
-		case EW_WRITEUNINSTALLER:	str = "WriteUninstaller: 3 [name, offset, icon_size]";break;
+		case EW_FINDCLOSE:			str = DecodeFindFiles(ent);break;
+		case EW_FINDNEXT:			str = DecodeFindFiles(ent);break;
+		case EW_FINDFIRST:			str = DecodeFindFiles(ent);break;
+		case EW_WRITEUNINSTALLER:	str = "!WriteUninstaller: 3 [name, offset, icon_size]";break;
 	//	case EW_LOG:				str = "LogText: 2 [0, text] / LogSet: [1, logstate]";break;
-		case EW_SECTIONSET:			str = "SectionSetText:    3: [idx, 0, text] / SectionGetText:    3: [idx, 1, output] / SectionSetFlags:   3: [idx, 2, flags] /  SectionGetFlags:   3: [idx, 3, output] / InstTypeGetFlags:  3: [idx, 1, output]";break;
-		case EW_GETLABELADDR:		str = "both of these get converted to EW_ASSIGNVAR";break;
-		case EW_GETFUNCTIONADDR:	str = "both of these get converted to EW_ASSIGNVAR";break;
-		case EW_LOCKWINDOW:			str = "EW_LOCKWINDOW";break;
-		case EW_FINDPROC:			str = "FindProc: 1 [process_name]";break;
+		case EW_SECTIONSET:			str = "!SectionSetText:    3: [idx, 0, text] / SectionGetText:    3: [idx, 1, output] / SectionSetFlags:   3: [idx, 2, flags] /  SectionGetFlags:   3: [idx, 3, output] / InstTypeGetFlags:  3: [idx, 1, output]";break;
+		case EW_GETLABELADDR:		str = "!both of these get converted to EW_ASSIGNVAR";break;
+		case EW_GETFUNCTIONADDR:	str = "!both of these get converted to EW_ASSIGNVAR";break;
+		case EW_LOCKWINDOW:			str = "!EW_LOCKWINDOW";break;
+		case EW_FINDPROC:			str = "!FindProc: 1 [process_name]";break;
 	default:
 		 str = " !! __  unknow __ !!";
 		break;
