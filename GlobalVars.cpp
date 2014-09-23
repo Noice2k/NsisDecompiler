@@ -4,6 +4,7 @@
 
 CGlobalVars::CGlobalVars(void)
 {
+	SetVarCount(80);
 }
 
 
@@ -17,8 +18,27 @@ CGlobalVars::~CGlobalVars(void)
 void CGlobalVars::SetVarCount(int count)
 {
 	_max_var_count = count+1; 
+	_values.resize(_max_var_count);
 
+}
 
+/************************************************************************/
+//	 получим значение переменной по 
+/************************************************************************/
+std::string CGlobalVars::GetVarValue(int id)
+{
+	return _values[id];
+}
+
+/************************************************************************/
+//
+/************************************************************************/
+void CGlobalVars::SetVarValue(int id,std::string var)
+{
+	if ((id >=0) && (id<_max_var_count))
+	{
+		_values[id] = var;
+	}
 }
 
 /************************************************************************/

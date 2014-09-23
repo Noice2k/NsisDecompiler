@@ -111,6 +111,7 @@
     <ClInclude Include="LZMA.h" />
     <ClInclude Include="NsisDecompiler.h" />
     <ClInclude Include="NsisDecompilerDlg.h" />
+    <ClInclude Include="NSISEmulator.h" />
     <ClInclude Include="NsisFile.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />
@@ -122,6 +123,7 @@
     <ClCompile Include="LZMA.cpp" />
     <ClCompile Include="NsisDecompiler.cpp" />
     <ClCompile Include="NsisDecompilerDlg.cpp" />
+    <ClCompile Include="NSISEmulator.cpp" />
     <ClCompile Include="NsisFile.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -140,4 +142,9 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <ProjectExtensions>
+    <VisualStudio>
+      <UserProperties RESOURCE_FILE="NsisDecompiler.rc" />
+    </VisualStudio>
+  </ProjectExtensions>
 </Project>

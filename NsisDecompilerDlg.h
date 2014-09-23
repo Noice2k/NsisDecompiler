@@ -4,6 +4,8 @@
 
 #pragma once
 #include "NsisFile.h"
+#include "afxcmn.h"
+#include "NSISEmulator.h"
 
 // CNsisDecompilerDlg dialog
 class CNsisDecompilerDlg : public CDialogEx
@@ -23,6 +25,7 @@ public:
 protected:
 	HICON m_hIcon;
 
+	
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
 	afx_msg void OnPaint();
@@ -32,6 +35,16 @@ public:
 	afx_msg void OnBnClickedButton1();
 	//	 file processor
 	CNsisFile	_nsisFile;
-
+	CNSISEmulator _nsisEmulator;
 	
+
+
+	afx_msg void OnBnClickedOk();
+	afx_msg void OnBnClickedCancel();
+	CListCtrl m_SourceCode;
+	CListCtrl m_Stack;
+	CListCtrl m_Variables;
+	CListCtrl m_CallSteck;
+	afx_msg void OnBnClickedButton2();
+	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 };

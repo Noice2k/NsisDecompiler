@@ -430,10 +430,10 @@ bool CNsisFile::LoadEntries()
 void CNsisFile::FunctionFormatText(int entstart,std::string functiontype, std::string name)
 {
 
-	std::string str = "       "+functiontype+" "+ name + "\r\n";
+	std::string str = ""+functiontype+" "+ name + "  ";
 	int stroff = str.size();
 	str += _nsis_script_code[entstart];
-	str.insert(stroff+5,"   ");
+	//str.insert(stroff+5,"   ");
 	_nsis_script_code[entstart] = str;
 	for (unsigned i = entstart+1; i < _nsis_script_code.size();i++)
 	{
@@ -445,7 +445,8 @@ void CNsisFile::FunctionFormatText(int entstart,std::string functiontype, std::s
 			break;
 		}
 		str = _nsis_script_code[i];
-		str.insert(5, "   ");
+		//str.insert(5, "   ");
+		str.insert(0, "   ");
 		_nsis_script_code[i] = str;
 	}
 
@@ -597,7 +598,7 @@ bool CNsisFile::LoadLandTables()
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-std::string CNsisFile::GetNsisString(int offset)
+std::string CNsisFile::GetNsisString(int offset,bool isvalue)
 {
 	std::wstring wstr;
 
@@ -672,8 +673,19 @@ std::string CNsisFile::GetNsisString(int offset)
 				}
 				else
 				{
-					std::string var = _global_vars.GetVarName(nData);
+					std::string var;
+					if (isvalue)
+					{
+						var =  _global_vars.GetVarValue(nData);
+					}
+					else
+					{
+						 var = _global_vars.GetVarName(nData);
+					}
+					
 					wstr.insert(wstr.end(),var.begin(),var.end());
+					
+					
 				}
 			}
 		}
@@ -771,10 +783,10 @@ std::string CNsisFile::DecodeIntOp(entry ent)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-std::string CNsisFile::GetStringFromParm(entry ent,int id_)
+std::string CNsisFile::GetStringFromParm(entry ent,int id_,bool isvalue)
 {
 	int id = id_ < 0 ? -id_ : id_;
-	std::string str = GetNsisString( ent.offsets[id & 0xF]);
+	std::string str = GetNsisString( ent.offsets[id & 0xF],isvalue);
 	return str;
 }
 
@@ -787,8 +799,11 @@ std::string CNsisFile::DecodeStrCmp(entry ent)
 	std::string var1 = GetStringFromParm(ent,0x20);
 	std::string var2 = GetStringFromParm(ent,0x31);
 
+	int off2 = ent.offsets[2] == 0 ? 0 : ent.offsets[2] -1;
+	int off3 = ent.offsets[3] == 0 ? 0 : ent.offsets[3] -1;
+	
 	char buff[0x10];
-	sprintf_s(buff,0x10,"] %i %i",ent.offsets[2],ent.offsets[3]);
+	sprintf_s(buff,0x10,"] %i %i",off2,off3);
 	str = "StrCmp [" + var1 + "] ["+ var2;
 	str += buff;
 	//	"StrCmp: 5 [str1, str2, jump_if_equal, jump_if_not_equal, case-sensitive?]"
@@ -810,7 +825,7 @@ std::string CNsisFile::DecodeNopJump(entry ent)
 	}
 	else
 	{
-		sprintf_s(buff,0x10,"Jump  %i",ent.offsets[0]);
+		sprintf_s(buff,0x10,"Goto  %i",ent.offsets[0]);
 	}
 
 	return buff;
@@ -863,7 +878,12 @@ std::string CNsisFile::DecodeFileOperation(entry ent)
 		}
 		break;
 	case EW_FPUTS:
-			str = "FileWrite: 3 [handle, string, ?int:string]";break;
+		{
+			std::string out = _global_vars.GetVarName(ent.offsets[0]);
+			std::string buff = GetNsisString(ent.offsets[1]);
+
+			str = "FileWriteA " + out + " " + buff;break;
+		}
 		break;
 	case EW_FGETS:
 		{
@@ -880,7 +900,12 @@ std::string CNsisFile::DecodeFileOperation(entry ent)
 		}	
 		break;
 	case EW_FPUTWS:
-			str = "FileWriteUTF16LE: 3 [handle, string, ?int:string]";break;
+		{
+			std::string out = _global_vars.GetVarName(ent.offsets[0]);
+			std::string buff = GetNsisString(ent.offsets[1]);
+			//str = "FileWriteUTF16LE: 3 [handle, string, ?int:string]";break;
+			str = "FileWriteW " + out + " " + buff;break;
+		}
 		break;
 	case EW_FGETWS:
 		{
@@ -897,10 +922,20 @@ std::string CNsisFile::DecodeFileOperation(entry ent)
 		}break;
 	case EW_FSEEK:
 		{
-			std::string handle = _global_vars.GetVarName(ent.offsets[0]);
-			std::string offset = _global_vars.GetVarName(ent.offsets[1]);
+			//#  define FILE_BEGIN 0
+			//#  define FILE_CURRENT 1
+			//	#  define FILE_END 2
+			std::string mode ;
+			if (0 == ent.offsets[3]) mode = "FILE_BEGIN";
+			if (1 == ent.offsets[3]) mode = "FILE_CURRENT";
+			if (2 == ent.offsets[3]) mode = "FILE_END";
+			
 
-			str = "FileSeek " + handle + " " + offset;
+			// FileSeek: 4  [handle, offset, mode, >=0?positionoutput]
+			std::string handle = _global_vars.GetVarName(ent.offsets[0]);
+			std::string offset = GetNsisString(ent.offsets[2]);
+
+			str = "FileSeek " + handle + " " + offset + " " + mode;
 		}break;
 	default:
 		break;
@@ -1055,9 +1090,9 @@ std::string CNsisFile::DecodeIntCmp(entry ent)
 	std::string var1 = GetStringFromParm(ent,0x20);
 	std::string var2 = GetStringFromParm(ent,0x31);
 	std::string str = "IntCmp " + var1 + " " + var2;
-	int off2 = ent.offsets[2] == 0 ? 0 : ent.offsets[2] - 1;
-	int off3 = ent.offsets[3] == 0 ? 0 : ent.offsets[3] - 1;
-	int off4 = ent.offsets[4] == 0 ? 0 : ent.offsets[4] - 1;
+	int off2 = ent.offsets[2] == 0 ? 0 : ent.offsets[2] -1;
+	int off3 = ent.offsets[3] == 0 ? 0 : ent.offsets[3] -1;
+	int off4 = ent.offsets[4] == 0 ? 0 : ent.offsets[4] -1;
 
 	char buff[0x10];
 	sprintf_s(buff,0x10," %4.4i %4.4i %4.4i",off2,off3,off4);
@@ -1251,7 +1286,7 @@ std::string CNsisFile::DecodeMessageBox(entry ent)
 	}
 
 	//"!MessageBox: 5,[MB_flags,text,retv1:retv2,moveonretv1:moveonretv2]"
-	std::string str = "MessageBox " + flags  + "\""+ GetNsisString(ent.offsets[1]); 
+	std::string str = "MessageBox " + flags  + " \""+ GetNsisString(ent.offsets[1]); 
 	char buff[0x100];
 	sprintf_s(buff,0x100,"\" %4.4i %4.4i", ent.offsets[3],ent.offsets[5]);
 	str += buff;
@@ -1355,8 +1390,8 @@ void CNsisFile::ProcessingEntries()
 	for (unsigned i = 0x00;i<_nsis_entry.size(); i++ )
 	{
 		entry ent = _nsis_entry[i];
-		sprintf_s(buff,0x10,"%4.4i : ",i );
-		std::string str = buff;
+		sprintf_s(buff,0x10,"%4.4i   ",i );
+		std::string str ;//= buff;
 		str += EntryToString(ent);
 		_nsis_script_code.push_back(str);
 	}

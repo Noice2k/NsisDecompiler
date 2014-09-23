@@ -67,7 +67,7 @@ public:
 
 	CGlobalVars		_global_vars;
 
-private:
+//private:
 	bool LoadPages();
 	bool LoadSection();
 	bool LoadEntries();
@@ -107,8 +107,8 @@ private:
 	std::string DecodeGetTempFileName(entry ent);
 	std::string DecodeMessageBox(entry ent);
 	std::string FormatFunction(int start);
-    std::string GetNsisString(int offset);
-	std::string GetStringFromParm(entry ent,int id);
+    std::string GetNsisString(int offset,bool isvalue = false);
+	std::string GetStringFromParm(entry ent,int id,bool isvalue = false);
 
 	//	install pages
 	std::vector<page> _nsis_pages;
