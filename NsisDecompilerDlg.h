@@ -45,6 +45,13 @@ public:
 	CListCtrl m_Stack;
 	CListCtrl m_Variables;
 	CListCtrl m_CallSteck;
+	CImageList m_ImageList;
+
+	void	ShowVariables();
+	void	ShowStack();
+	void	ShowCallStack();
+
+	int m_lastitem;
 	afx_msg void OnBnClickedButton2();
 	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 };

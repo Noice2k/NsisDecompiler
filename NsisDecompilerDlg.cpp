@@ -51,9 +51,20 @@ BOOL CNsisDecompilerDlg::OnInitDialog()
 	//  when the application's main window is not a dialog
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
+	HICON h1 = LoadIcon(AfxGetInstanceHandle(),MAKEINTRESOURCE(IDI_ICON1));
+	HICON h2 = LoadIcon(AfxGetInstanceHandle(),MAKEINTRESOURCE(IDI_ICON2));
+	m_ImageList.Create(16,16,ILC_COLOR24,0,0);
+	m_ImageList.Add(h1);
+	m_ImageList.Add(h2);
 
+	m_lastitem = -1;
+
+//	m_SourceCode.SetImageList(&m_ImageList,LVSIL_STATE);
+	m_SourceCode.SetImageList(&m_ImageList,LVSIL_SMALL);
+	//m_SourceCode.SetImageList(&m_ImageList,LVSIL_NORMAL);
+	
 	// TODO: Add extra initialization here
-	m_SourceCode.SetExtendedStyle(m_SourceCode.GetExtendedStyle() |LVS_EX_FULLROWSELECT);
+	m_SourceCode.SetExtendedStyle(m_SourceCode.GetExtendedStyle() |LVS_EX_FULLROWSELECT|LVS_EX_SIMPLESELECT);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -116,6 +127,9 @@ void CNsisDecompilerDlg::OnBnClickedButton1()
 
 	_nsisEmulator.file = &_nsisFile;
 	_nsisEmulator._source_code_view = &m_SourceCode;
+	_nsisEmulator._variables_vew    = &m_Variables;
+	_nsisEmulator._stack_view		= &m_Stack;
+	_nsisEmulator._call_stack_view = &m_CallSteck;
 	_nsisEmulator.Init();
 	
 	_nsisEmulator.Execute();
@@ -142,21 +156,103 @@ void CNsisDecompilerDlg::OnBnClickedButton2()
 	_nsisEmulator._breakByStep = true;
 }
 
+void	CNsisDecompilerDlg::ShowVariables()
+{
+	for (unsigned i = 0;i < _nsisFile._global_vars._max_var_count;i++)
+	{
+		m_Variables.SetItemText(i,1,_nsisFile._global_vars.GetVarValue(i).c_str());
+	}
+
+}
+
+void	CNsisDecompilerDlg::ShowStack()
+{
+	m_Stack.DeleteAllItems();
+	m_Stack.InsertColumn(0,"id",LVCFMT_LEFT,50);
+	m_Stack.InsertColumn(1,"value",LVCFMT_LEFT,450);
+
+	CString num;
+	for (unsigned i = 0x00;i< _nsisEmulator._stack.size();i++)
+	{
+		num.Format("%4.4i",i);
+		m_Stack.InsertItem(i,num,0);
+		m_Stack.SetItemText(i,1,_nsisEmulator._stack[i].c_str());
+	}
+}
+
+void	CNsisDecompilerDlg::ShowCallStack()
+{
+	m_CallSteck.DeleteAllItems();
+	m_CallSteck.InsertColumn(0,"id",LVCFMT_LEFT,50);
+	m_CallSteck.InsertColumn(1,"value",LVCFMT_LEFT,450);
+
+	CString num;
+	for (unsigned i = 0x00;i< _nsisEmulator._function_call_stack.size();i++)
+	{
+		num.Format("%4.4i",i);
+		m_CallSteck.InsertItem(i,num,0);
+		m_CallSteck.SetItemText(i,1,_nsisEmulator._function_call_stack[i].c_str());
+	}
+}
 
 LRESULT CNsisDecompilerDlg::DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	if (message == WM_USER+100)
 	{
-		POSITION pos = m_SourceCode.GetFirstSelectedItemPosition();
+	/*	POSITION pos = m_SourceCode.GetFirstSelectedItemPosition();
 		while( pos >0) 
 		{
+
 			int  index = m_SourceCode.GetNextSelectedItem( pos );
 			m_SourceCode.SetItemState(index, 0, LVS_SHOWSELALWAYS|LVS_SINGLESEL);
 		}
-		int id = wParam;
-		//m_SourceCode.SetSelectionMark(pos);
-		m_SourceCode.SetItemState(id,LVS_SINGLESEL, LVS_SINGLESEL);
-		m_SourceCode.Invalidate();
+		*/
+	
+		
+		
+		if ((-1 != m_lastitem) && (m_lastitem != wParam))
+		{
+				m_SourceCode.SetItem(m_lastitem,0,LVIF_IMAGE,NULL,0,0,0,NULL,0);
+		}
+		m_lastitem = wParam;
+
+		m_SourceCode.SetItem(m_lastitem,0,LVIF_IMAGE,NULL,1,0,0,NULL,0);
+
+		
+
+		int top = m_SourceCode.GetTopIndex();
+		int bottom = top + m_SourceCode.GetCountPerPage();
+		CRect rt;
+		m_SourceCode.GetItemRect(0,&rt,LVIR_BOUNDS);
+		CSize size;
+
+
+		if (m_lastitem < top)
+		{
+			size.cy = rt.Height()*(m_lastitem - top);
+			m_SourceCode.Scroll(size);
+		}
+		
+		if (m_lastitem > bottom)
+		{
+			size.cy = rt.Height()*(m_lastitem - top);
+			m_SourceCode.Scroll(size/*(m_lastitem - top)*0x10000*/);
+		}
+		
+		ShowVariables();
+		ShowStack();
+		ShowCallStack();
+
+/*
+		int nLast = n + m_myListCtrl.GetCountPerPage();
+
+		for (; n < nLast; n++)
+		{
+			m_myListCtrl.SetItemState(n, LVIS_SELECTED, LVIS_SELECTED);
+			ASSERT(m_myListCtrl.GetItemState(n, LVIS_SELECTED) == LVIS_SELECTED); 
+		}
+		*/
+		return true;
 	}
 
 	return CDialogEx::DefWindowProc(message, wParam, lParam);

@@ -79,6 +79,7 @@ public:
 
 	void ProcessingFunctions();
 	void FunctionFormatText(int entstart,std::string functiontype,  std::string  name);
+	void CNsisFile::myRegGetStr(HKEY root, const TCHAR *sub, const TCHAR *name, TCHAR *out, int x64);
 
 	std::string EntryToString(entry ent);
 

@@ -24,10 +24,21 @@ void CNSISEmulator::Init()
 	for (unsigned i = 0x00;i< file->_nsis_script_code.size();i++)
 	{
 		num.Format("%4.4i",i);
-		_source_code_view->InsertItem(i,num);
+		_source_code_view->InsertItem(i,num,0);
 		_source_code_view->SetItemText(i,1,file->_nsis_script_code[i].c_str());
 	}
-	SendMessage(theApp.GetMainWnd()->GetSafeHwnd(),WM_USER+100,10,0);
+	//SendMessage(theApp.GetMainWnd()->GetSafeHwnd(),WM_USER+100,10,0);
+
+
+	_variables_vew->InsertColumn(0,"name",LVCFMT_LEFT,50);
+	_variables_vew->InsertColumn(1,"value",LVCFMT_LEFT,450);
+	for (int i = 0;i < file->_global_vars._max_var_count;i++)
+	{
+		_variables_vew->InsertItem(i,file->_global_vars.GetVarName(i).c_str(),0);
+
+	}
+
+	
 
 }
 
@@ -150,6 +161,43 @@ void  myitoa(TCHAR *s, int d)
 	sprintf_s(s,NSIS_MAX_STRLEN,c,d);
 }
 
+TCHAR * findchar(TCHAR *str, TCHAR c)
+{
+	while (*str && *str != c)
+	{
+		str = CharNext(str);
+	}
+	return str;
+}
+
+TCHAR * skip_root(TCHAR *path)
+{
+	TCHAR *p = CharNext(path);
+	TCHAR *p2 = CharNext(p);
+
+	if (*path && p[0] == _T(':') && p[1] == _T('\\')) // *(WORD*)p == CHAR2_TO_WORD(_T(':'), _T('\\')))
+	{
+		return CharNext(p2);
+	}
+	else if (path[0] == _T('\\') && path[1] == _T('\\')) // *(WORD*)path == CHAR2_TO_WORD(_T('\\'),_T('\\')))
+	{
+		// skip host and share name
+		int x = 2;
+		while (x--)
+		{
+			p2 = findchar(p2, _T('\\'));
+			if (!*p2)
+				return NULL;
+			p2++; // skip backslash
+		}
+
+		return p2;
+	}
+	else
+		return NULL;
+}
+
+
 DWORD WINAPI ThreadProc(CONST LPVOID lpParam) 
 {
 	CNSISEmulator * emul = (CNSISEmulator*) lpParam;
@@ -161,6 +209,7 @@ void CNSISEmulator::Execute()
 {
 	CreateThread(NULL, 0, &ThreadProc, this, 0, NULL);
 }
+
 
 int CNSISEmulator::ExecuteEntry(int entry_id)
 {
@@ -259,7 +308,48 @@ int CNSISEmulator::ExecuteEntry(int entry_id)
 			}
 			file->_global_vars.SetVarValue(parm0,p);
 		}break;
+	case EW_CREATEDIR: 
+		{
+			std::string path = file->GetNsisString(parm0,true);
+			TCHAR *buf1= (TCHAR *)path.c_str();
+			{
+				TCHAR *p = skip_root(buf1);
+				TCHAR c = _T('c');
+				if (p)
+				{
+					while (c)
+					{
+						p = findchar(p, _T('\\'));
+						c = *p;
+						*p = 0;
+						if (!CreateDirectory(buf1, NULL))
+						{
+							if (GetLastError() != ERROR_ALREADY_EXISTS)
+							{                
+								int i = 0;
+							}
+							else if ((GetFileAttributes(buf1) & FILE_ATTRIBUTE_DIRECTORY) == 0)
+							{
+								int i = 0;
+							}
+						}
+						else
+						{
+						}
+						*p++ = c;
+					}
+				}
+			}
+			if (parm1)
+			{
+				//mystrcpy(state_output_directory,buf1);
+				SetCurrentDirectory(buf1);
+			}
+		}break;
+	case EW_SETFLAG:
+		break;
 	default:
+
 		int f= 0;
 		break;
 	}

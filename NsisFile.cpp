@@ -404,6 +404,9 @@ bool	CNsisFile::ProcessingHeader()
 			*/
 		}
 	}
+	std::string str1 = GetNsisString(_globalheader.install_directory_ptr,true);
+	_global_vars.SetVarValue(21,str1);
+	std::string str2 = GetNsisString(_globalheader.install_directory_auto_append,true);
 	return false;
 }
 
@@ -595,6 +598,28 @@ bool CNsisFile::LoadLandTables()
 #define NS_IS_CODE(x) ((x) & 0xE000)
 
 #define DECODE_SHORT(c) ((WORD)(c[0]&0x7FFF))
+
+const TCHAR SYSREGKEY[]   = _T("Software\\Microsoft\\Windows\\CurrentVersion");
+const TCHAR QUICKLAUNCH[] = _T("\\Microsoft\\Internet Explorer\\Quick Launch");
+
+// The value of registry->sub->name is stored in out.  If failure, then out becomes
+// an empty string "".
+void CNsisFile::myRegGetStr(HKEY root, const TCHAR *sub, const TCHAR *name, TCHAR *out, int x64)
+{
+	HKEY hKey;
+	*out=0;
+	if (RegOpenKeyEx(root,sub,0,KEY_READ|(x64?KEY_WOW64_64KEY:0),&hKey) == ERROR_SUCCESS)
+	{
+		DWORD l = NSIS_MAX_STRLEN*sizeof(char);
+		DWORD t;
+		// Note that RegQueryValueEx returns Unicode strings if _UNICODE is defined for the
+		// REG_SZ type.
+		if (RegQueryValueEx(hKey,name,NULL,&t,(LPBYTE)out,&l ) != ERROR_SUCCESS || (t != REG_SZ && t != REG_EXPAND_SZ)) *out=0;
+		out[NSIS_MAX_STRLEN-1]=0;
+		RegCloseKey(hKey);
+	}
+}
+
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
@@ -650,10 +675,84 @@ std::string CNsisFile::GetNsisString(int offset,bool isvalue)
 			real_offset++;
 			if (nVarIdx == NS_SHELL_CODE)
 			{
-				//LPITEMIDLIST idl;
+				LPITEMIDLIST idl;
 
 				int x = 2;
 				DWORD ver = GetVersion();
+
+				BOOL use_shfolder =
+					// Use shfolder if not on 95/98
+					!((ver & 0x80000000) && (LOWORD(ver) != 0x5A04)) ||
+
+					// Unless the Application Data or Documents folder is requested
+					(
+					(fldrs[3] == CSIDL_COMMON_APPDATA) ||
+					(fldrs[3] == CSIDL_COMMON_DOCUMENTS)
+					);
+
+				/* Carry on... shfolder stuff is over. */
+
+				char out[NSIS_MAX_STRLEN];  
+
+				
+
+				if (fldrs[1] & 0x80)
+				{
+					std::string str = GetNsisString(fldrs[1] & 0x3F,true);
+					myRegGetStr(HKEY_LOCAL_MACHINE, SYSREGKEY, str.c_str(), out, fldrs[1] & 0x40);
+					if (!*out)
+					{
+						std::string str = GetNsisString(fldrs[3],true);
+							//GetNSISString(out, fldrs[3]);
+					}
+						
+					x = 0;
+				}
+				else if (fldrs[1] == CSIDL_SYSTEM)
+				{
+					GetSystemDirectory(out, NSIS_MAX_STRLEN);
+					x = 0;
+				}
+				else if (fldrs[1] == CSIDL_WINDOWS)
+				{
+					GetWindowsDirectory(out, NSIS_MAX_STRLEN);
+					x = 0;
+				}
+
+				while (x--)
+				{
+					if (use_shfolder)
+					{
+						
+						if (!SHGetFolderPath(NULL, fldrs[x], NULL, SHGFP_TYPE_CURRENT, out))
+						{
+							break;
+						}
+					}
+
+					if (!SHGetSpecialFolderLocation(NULL, fldrs[x], &idl))
+					{
+						BOOL res = SHGetPathFromIDList(idl, out);
+						CoTaskMemFree(idl);
+						if (res) break;
+					}
+
+					*out=0;
+				}
+
+				if (*out)
+				{
+					// all users' version is CSIDL_APPDATA only for $QUICKLAUNCH
+					// for normal $APPDATA, it'd be CSIDL_APPDATA_COMMON
+					if (fldrs[3] == CSIDL_APPDATA)
+					{
+						//mystrcat(out, QUICKLAUNCH);
+						int i = 0;
+					}
+				}
+				//validate_filename(out);
+				std::string str1 = out;
+				wstr.insert(wstr.end(),str1.begin(),str1.end());
 			}
 			if (nVarIdx == NS_LANG_CODE)
 			{
