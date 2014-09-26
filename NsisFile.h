@@ -15,6 +15,7 @@ struct sfile
 	char	filename[0x200];
 };
 
+
 static int *cur_langtable;
 class CNsisFile
 {

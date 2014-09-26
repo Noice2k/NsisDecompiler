@@ -2,11 +2,72 @@
 #include "NSISEmulator.h"
 #include <string>
 #include "NsisDecompiler.h"
+#include "Utils.h"
 
 
 CNSISEmulator::CNSISEmulator(void)
 {
 	_breakByStep = false;
+	_runtoPoint = true;
+	
+	g_hres = OleInitialize(NULL);
+
+	plugin_extra_parameters.exec_flags = &g_exec_flags;
+	plugin_extra_parameters.ExecuteCodeSegment = NULL;
+	plugin_extra_parameters.RegisterPluginCallback = NULL;
+	plugin_extra_parameters.validate_filename = NULL;
+
+}
+
+
+typedef struct _loaded_plugin
+{
+	struct _loaded_plugin* next;
+	NSISPLUGINCALLBACK proc;
+	HMODULE dll;
+}
+loaded_plugin;
+
+static loaded_plugin* g_plugins = 0; // not thread safe!
+
+
+BOOL NSISCALL Plugins_CanUnload(HANDLE pluginHandle)
+{
+	loaded_plugin* p;
+
+	for (p = g_plugins; p; p = p->next)
+	{
+		if (p->dll == pluginHandle)
+		{
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+int NSISCALL RegisterPluginCallback(HMODULE pluginHandle, NSISPLUGINCALLBACK proc)
+{
+	loaded_plugin* p;
+
+	if (!Plugins_CanUnload(pluginHandle))
+	{
+		// already registered
+		return 1;
+	}
+
+	p = (loaded_plugin*) GlobalAlloc(GPTR, sizeof(loaded_plugin));
+	if (p)
+	{
+		p->proc   = proc;
+		p->dll    = pluginHandle;
+		p->next   = g_plugins;
+
+		g_plugins = p;
+
+		return 0;
+	}
+
+	return -1;
 }
 
 
@@ -69,6 +130,8 @@ void CNSISEmulator::PushPopExch(entry ent)
 
 }
 
+
+
 /**
  * If v is negative, then the address to resolve is actually
  * stored in the global user variables.  Convert the value
@@ -93,11 +156,22 @@ int CNSISEmulator::ExecuteCodeSegment(std::string FunctionName,int pos)
 
 	while (pos >= 0)
 	{
-		SendMessage(theApp.GetMainWnd()->GetSafeHwnd(),WM_USER+100,pos,0);
-		while (_breakByStep == false)
+		if (_runtoPoint == true)
 		{
-			Sleep(1);
+			if (pos == 1148)
+			{
+				_runtoPoint = false;
+			}
 		}
+		else
+		{
+			SendMessage(theApp.GetMainWnd()->GetSafeHwnd(),WM_USER+100,pos,0);
+			while (_breakByStep == false)
+			{
+				Sleep(1);
+			}
+		}
+		
 		_breakByStep = false;
 		int rv;
 		if (file->_nsis_entry[pos].which == EW_RET) 
@@ -155,54 +229,106 @@ int CNSISEmulator::GetIntFromParm(int id)
 	return i;
 }
 
-void  myitoa(TCHAR *s, int d)
+
+TCHAR * my_GetTempFileName(TCHAR *buf, const TCHAR *dir)
 {
-	static const TCHAR c[] = _T("%d");
-	sprintf_s(s,NSIS_MAX_STRLEN,c,d);
+  int n = 100;
+  while (n--)
+  {
+    TCHAR prefix[4] = _T("nsa");
+    //*(LPDWORD)prefix = CHAR4_TO_DWORD('n', 's', 'a', 0);
+    prefix[2] += (TCHAR)(GetTickCount() % 26);
+    if (GetTempFileName(dir, prefix, 0, buf))
+      return buf;
+  }
+  *buf = 0;
+  return 0;
 }
-
-TCHAR * findchar(TCHAR *str, TCHAR c)
-{
-	while (*str && *str != c)
-	{
-		str = CharNext(str);
-	}
-	return str;
-}
-
-TCHAR * skip_root(TCHAR *path)
-{
-	TCHAR *p = CharNext(path);
-	TCHAR *p2 = CharNext(p);
-
-	if (*path && p[0] == _T(':') && p[1] == _T('\\')) // *(WORD*)p == CHAR2_TO_WORD(_T(':'), _T('\\')))
-	{
-		return CharNext(p2);
-	}
-	else if (path[0] == _T('\\') && path[1] == _T('\\')) // *(WORD*)path == CHAR2_TO_WORD(_T('\\'),_T('\\')))
-	{
-		// skip host and share name
-		int x = 2;
-		while (x--)
-		{
-			p2 = findchar(p2, _T('\\'));
-			if (!*p2)
-				return NULL;
-			p2++; // skip backslash
-		}
-
-		return p2;
-	}
-	else
-		return NULL;
-}
-
 
 DWORD WINAPI ThreadProc(CONST LPVOID lpParam) 
 {
 	CNSISEmulator * emul = (CNSISEmulator*) lpParam;
 	emul->Run();
 	ExitThread(0);
+}
+
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+void CNSISEmulator::CopyStrToWstr(char * in,WCHAR *out)
+{
+	std::wstring ws;
+	ws.insert(ws.begin(),in,in+strlen(in));
+	memset(out,0,NSIS_MAX_STRLEN*sizeof(WCHAR));
+	memcpy(out,&ws[0],ws.size()*sizeof(WCHAR));
+}
+
+/************************************************************************/
+//
+/************************************************************************/
+void CNSISEmulator::CreateStack()
+{
+	g_st = NULL;
+	stack_t * next = NULL;
+	for (unsigned i = 0x00;i<_stack.size();i++)
+	{
+		std::string str = _stack[i];
+		stack_t *st = (stack_t *)GlobalAlloc(GPTR,sizeof(stack_t));
+		//stack_t *st = new stack_t;
+		CopyStrToWstr((char*)str.c_str(),st->text);
+		if (g_st == NULL)
+		{
+			g_st = st;
+			st->next = NULL;
+			next = g_st;
+		}
+		else
+		{
+			next->next = st;
+			st->next = NULL;
+			next = st;
+		}
+		
+	}
+
+	g_usrvars = (WCHAR*) GlobalAlloc(GPTR,NSIS_MAX_STRLEN*sizeof(WCHAR)*file->_global_vars._max_var_count);
+	for (int i = 0x00; i< file->_global_vars._max_var_count -1; i++)
+	{
+		std::string var = file->_global_vars.GetVarValue(i);
+		WCHAR *w =  g_usrvars+ i * NSIS_MAX_STRLEN;
+		CopyStrToWstr((char*)var.c_str(),w);
+	}
+
+}
+/************************************************************************/
+//
+/************************************************************************/
+void CNSISEmulator::DeleteStack()
+{
+	_stack.resize(0);
+	while (g_st != NULL)
+	{
+		std::string str;
+		str.insert(str.begin(),g_st->text,g_st->text+wcslen(g_st->text));
+		_stack.push_back(str);
+		stack_t *d = g_st;
+		g_st = g_st->next;
+		GlobalFree((HGLOBAL)d);
+	}
+
+
+	for (int i = 0x00; i< file->_global_vars._max_var_count-1; i++)
+	{
+		WCHAR *w =  g_usrvars+ i * NSIS_MAX_STRLEN;
+		std::string str;
+		str.insert(str.begin(),w,w+wcslen(w));
+		file->_global_vars.SetVarValue(i,str);
+	}
+	GlobalFree((HGLOBAL)g_usrvars);
+//	delete []g_usrvars;
+
+
 }
 
 void CNSISEmulator::Execute()
@@ -213,7 +339,8 @@ void CNSISEmulator::Execute()
 
 int CNSISEmulator::ExecuteEntry(int entry_id)
 {
-	char buff[0x1000];
+	TCHAR buff[NSIS_MAX_STRLEN] = {0};
+	int exec_error = 0;
 	//	 get current entry
 	entry	_ent = file->_nsis_entry[entry_id];
 
@@ -237,7 +364,6 @@ int CNSISEmulator::ExecuteEntry(int entry_id)
 	case EW_PUSHPOP: 
 		{
 			PushPopExch(_ent);
-			
 		}
 		break;
 	case EW_STRCMP:
@@ -278,7 +404,6 @@ int CNSISEmulator::ExecuteEntry(int entry_id)
 	case EW_READREGSTR: // read registry string
 		{
 			HKEY hKey=myRegOpenKey(_ent,KEY_READ);
-			TCHAR buff[NSIS_MAX_STRLEN] = {0};
 			TCHAR *p=buff;
 			std::string buf3 = file->GetStringFromParm(_ent,0x33,true); // buf3 == key name
 			p[0]=0;
@@ -346,8 +471,202 @@ int CNSISEmulator::ExecuteEntry(int entry_id)
 				SetCurrentDirectory(buf1);
 			}
 		}break;
+	case EW_GETTEMPFILENAME:
+		{
+			std::string tempfolder = file->GetNsisString(parm1,true);
+			TCHAR *textout=buff;
+			my_GetTempFileName(textout, tempfolder.c_str());
+			file->_global_vars.SetVarValue(parm0,buff);
+		}
+		break;
+	case EW_DELETEFILE:
+		{
+			std::string path = file->GetNsisString(parm0,true);
+			myDelete((TCHAR *)path.c_str(),parm1);
+		}
+		break;
 	case EW_SETFLAG:
 		break;
+	case EW_IFFLAG:
+		{
+			return parm1;
+			/*int f=lent.offsets[!FIELDN(g_exec_flags,parm2)];
+			FIELDN(g_exec_flags,parm2)&=parm3;
+			return f;
+			*/
+		}break;
+	case EW_EXTRACTFILE:
+		{
+			HANDLE hOut;
+			int ret;
+			std::string str = file->GetNsisString(parm1,true);
+			TCHAR *buf3 = (TCHAR *)str.c_str();
+			TCHAR *buf0 = &buff[0];
+			int overwriteflag = parm0 & 7;
+
+			
+			if (validpathspec(buf3))
+			{
+				mystrcpy(buf0,buf3);
+			}
+			else mystrcat(addtrailingslash(mystrcpy(buf0,state_output_directory.c_str())),buf3);
+			validate_filename(buf0);
+			if (overwriteflag >= 3) // check date and time
+			{
+				WIN32_FIND_DATA *ffd=file_exists(buf0);
+				// if it doesn't exist, overwrite flag will be off (though it doesn't really matter)
+				int cmp=0;
+				if (ffd)
+				{
+					cmp=CompareFileTime(&ffd->ftLastWriteTime, (FILETIME*)(_ent.offsets + 3));
+				}
+				overwriteflag=!(cmp & (0x80000000 | (overwriteflag - 3)));
+			}
+			// remove read only flag if overwrite mode is on
+			if (!overwriteflag)
+			{
+				remove_ro_attr(buf0);
+			}
+			hOut=myOpenFile(buf0,GENERIC_WRITE,(overwriteflag==1)?CREATE_NEW:CREATE_ALWAYS);
+			if (hOut == INVALID_HANDLE_VALUE)
+			{
+				if (overwriteflag)
+				{
+					int exec_error = 0;
+					if (overwriteflag==2) exec_error++;
+					
+					break;
+				}
+			}
+			{
+				ret=GetCompressedDataFromDataBlock(parm2,hOut);
+			}
+			if (parm3 != 0xffffffff || parm4 != 0xffffffff)
+				SetFileTime(hOut,(FILETIME*)(_ent.offsets+3),NULL,(FILETIME*)(_ent.offsets+3));
+
+			CloseHandle(hOut);
+
+			if (ret < 0)
+			{
+				return EXEC_ERROR;
+			}
+
+		}break;
+	case EW_REGISTERDLL:
+		{
+			int exec_error = 0;
+			if (SUCCEEDED(g_hres))
+			{
+				HANDLE h=NULL;
+				std::string str0 = file->GetNsisString(parm0,true);
+				std::string str1 = file->GetNsisString(parm1,true);
+				TCHAR *buf1=(TCHAR *)str0.c_str();
+				TCHAR *buf0=(TCHAR *)str1.c_str();
+
+				if (parm4)
+					h=GetModuleHandle(buf1);
+				if (!h)
+					h=LoadLibraryEx(buf1, NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
+				if (h)
+				{
+					// Jim Park: Need to use our special NSISGetProcAddress to convert
+					// buf0 to char before calling GetProcAddress() which only takes 
+					// chars.
+					FARPROC funke = (FARPROC)NSISGetProcAddress(h,buf0);
+					if (funke)
+					{
+						
+						if (parm2)
+						{
+							if (funke())
+							{
+								exec_error++;
+							}
+						}
+						else
+						{
+							CreateStack();
+							void (*func)(HWND,int,TCHAR*,void*,void*);
+							func=(void (*)(HWND,int,TCHAR*,void*,void*))funke;
+							memset(&g_exec_flags,0,sizeof(g_exec_flags));
+							plugin_extra_parameters.RegisterPluginCallback = RegisterPluginCallback;
+							func(theApp.GetMainWnd()->GetSafeHwnd(),NSIS_MAX_STRLEN,(TCHAR*)g_usrvars,(void*)&g_st,&plugin_extra_parameters);
+							DeleteStack();
+						}
+					}
+					else
+					{
+						//update_status_text(LANG_CANNOTFINDSYMBOL,buf0);
+						//log_printf3(_T("Error registering DLL: %s not found in %s"),buf0,buf1);
+					}
+					//if (!parm3 && Plugins_CanUnload(h)) FreeLibrary(h);
+				}
+				else
+				{
+					//update_status_text_buf1(LANG_COULDNOTLOAD);
+					//log_printf2(_T("Error registering DLL: Could not load %s"),buf1);
+				}
+			}
+			else
+			{
+				//update_status_text_buf1(LANG_NOOLE);
+				//log_printf(_T("Error registering DLL: Could not initialize OLE"));
+			}
+
+		}break;
+	case EW_INTFMT: 
+		{
+			std::string str = file->GetNsisString(parm1,true);
+			std::string val = file->GetNsisString(parm2,true);
+			
+			sprintf_s(buff,0x100,str.c_str(),myatoi((char*)val.c_str()));
+			file->_global_vars.SetVarValue(parm0,buff);
+
+		}break;
+	case EW_INTOP:
+		{
+			int v,v2;
+			TCHAR *p=&buff[0];
+			v=myatoi((TCHAR *)file->GetNsisString(parm1,true).c_str());
+			v2=GetIntFromParm(2);
+			switch (parm3)
+			{
+			case 0: v+=v2; break;
+			case 1: v-=v2; break;
+			case 2: v*=v2; break;
+			case 3: if (v2) v/=v2; else { v=0; exec_error++; } break;
+			case 4: v|=v2; break;
+			case 5: v&=v2; break;
+			case 6: v^=v2; break;
+			case 7: v=!v; break;
+			case 8: v=v||v2; break;
+			case 9: v=v&&v2; break;
+			case 10: if (v2) v%=v2; else { v=0; exec_error++; } break;
+			case 11: v=v<<v2; break;
+			case 12: v=v>>v2; break;
+			}
+			myitoa(p,v);
+			file->_global_vars.SetVarValue(parm0,buff);
+		}
+		break;
+	case EW_INTCMP:
+		{
+			int v,v2;
+			v=GetIntFromParm(0);
+			v2=GetIntFromParm(1);
+			if (!parm5) {
+				// signed
+				if (v<v2) return parm3;
+				if (v>v2) return parm4;
+			}
+			else {
+				// unsigned
+				if ((unsigned int)v<(unsigned int)v2) return parm3;
+				if ((unsigned int)v>(unsigned int)v2) return parm4;
+			}
+		}
+		return parm2;
+
 	default:
 
 		int f= 0;
@@ -356,6 +675,22 @@ int CNSISEmulator::ExecuteEntry(int entry_id)
 	return 0;
 }
 
+
+int CNSISEmulator::GetCompressedDataFromDataBlock(int off,HANDLE hfile)
+{
+	
+	for (unsigned i = 0x00; i<file->_nsis_files.size();i++)
+	{
+		sfile s = file->_nsis_files[i];
+		if (off == s.offset)
+		{
+			DWORD ret = 0;
+			WriteFile(hfile,s.pointer,s.size,&ret,NULL);
+		}
+	}
+
+	return 0;
+}
 void CNSISEmulator::Run()
 {
 	

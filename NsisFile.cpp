@@ -115,29 +115,39 @@ void    CNsisFile::LoadExeDump(char * filename)
 		{
 		// .tex
 		case 0x7865742e:
-			_pe_dot_text_section.insert(_pe_dot_text_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
-			nsisoff = max(soff+ssize,nsisoff);
+			{
+				_pe_dot_text_section.insert(_pe_dot_text_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
+				nsisoff = max(soff+ssize,nsisoff);
+			}
 			break;
 		case 0x6164722e:
-			_pe_dot_rdata_section.insert(_pe_dot_rdata_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
-			nsisoff = max(soff+ssize,nsisoff);
+			{
+				_pe_dot_rdata_section.insert(_pe_dot_rdata_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
+				nsisoff = max(soff+ssize,nsisoff);
+			}
 			break;
 		case 0x7461642e:
-			_pe_dot_data_section.insert(_pe_dot_data_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
-			nsisoff = max(soff+ssize,nsisoff);
+			{
+				_pe_dot_data_section.insert(_pe_dot_data_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
+				nsisoff = max(soff+ssize,nsisoff);
+			}
 			break;
 		case 0x7273722e:
-			_pe_dot_rsrc_section.insert(_pe_dot_rsrc_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
-			nsisoff = max(soff+ssize,nsisoff);
+			{
+				_pe_dot_rsrc_section.insert(_pe_dot_rsrc_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
+				nsisoff = max(soff+ssize,nsisoff);
+			}
 			break;
 		case 0x6c65722e:
-			_pe_dot_reloc_section.insert(_pe_dot_reloc_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
-			nsisoff = max(soff+ssize,nsisoff+ssize);
+			{
+				_pe_dot_reloc_section.insert(_pe_dot_reloc_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
+				nsisoff = max(soff+ssize,nsisoff+ssize);
+			}
 			break;
 		case 0x61646e2e:
 			{
 				int c = ish.Misc.VirtualSize;
-				c/= NSIS_MAX_STRLEN;
+				c/= (NSIS_MAX_STRLEN*sizeof(WCHAR));
 				_global_vars.SetVarCount(c);
 			}
 			break;
@@ -406,6 +416,7 @@ bool	CNsisFile::ProcessingHeader()
 	}
 	std::string str1 = GetNsisString(_globalheader.install_directory_ptr,true);
 	_global_vars.SetVarValue(21,str1);
+	_global_vars.SetVarValue(25,"d:\\temp\\");
 	std::string str2 = GetNsisString(_globalheader.install_directory_auto_append,true);
 	return false;
 }

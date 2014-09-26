@@ -158,7 +158,7 @@ void CNsisDecompilerDlg::OnBnClickedButton2()
 
 void	CNsisDecompilerDlg::ShowVariables()
 {
-	for (unsigned i = 0;i < _nsisFile._global_vars._max_var_count;i++)
+	for (int i = 0;i < _nsisFile._global_vars._max_var_count;i++)
 	{
 		m_Variables.SetItemText(i,1,_nsisFile._global_vars.GetVarValue(i).c_str());
 	}

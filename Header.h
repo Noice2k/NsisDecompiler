@@ -10,6 +10,11 @@
 #define FH_FLAGS_NO_CRC 4
 #define FH_FLAGS_FORCE_CRC 8
 
+#define DEL_DIR 1
+#define DEL_RECURSE 2
+#define DEL_REBOOT 4
+#define DEL_SIMPLE 8
+
 #define FH_SIG 0xDEADBEEF
 
 // neato surprise signature that goes in firstheader. :)

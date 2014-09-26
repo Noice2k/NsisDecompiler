@@ -4,7 +4,7 @@
 
 CGlobalVars::CGlobalVars(void)
 {
-	SetVarCount(80);
+	
 }
 
 
