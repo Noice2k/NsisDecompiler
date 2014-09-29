@@ -188,10 +188,9 @@ enum
 	EW_SHELLEXEC,         // ShellExecute program: 4, [shell action, complete commandline, parameters, showwindow]
 	EW_EXECUTE,           // Execute program: 3,[complete command line,waitflag,>=0?output errorcode]
 	EW_GETFILETIME,       // GetFileTime; 3 [file highout lowout]
-	EW_GETDLLVERSION,     // GetDLLVersion: 3 [file highout lowout]
-	
+	//EW_GETDLLVERSION,     // GetDLLVersion: 3 [file highout lowout]
 	//EW_GETFONTVERSION,     // GetFontVersion: 2 [file version]
-	//EW_GETFONTNAME,     // GetFontName: 2 [file fontname]
+	EW_GETFONTNAME,     // GetFontName: 2 [file fontname]
 
 	EW_REGISTERDLL,       // Register DLL: 3,[DLL file name, string ptr of function to call, text to put in display (<0 if none/pass parms), 1 - no unload, 0 - unload]
 	EW_CREATESHORTCUT,    // Make Shortcut: 5, [link file, target file, parameters, icon file, iconindex|show mode<<8|hotkey<<16]

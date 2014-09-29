@@ -1453,9 +1453,9 @@ std::string CNsisFile::EntryToString(entry ent)
 		case EW_SHELLEXEC:			str = "!ShellExecute program: 4, [shell action, complete commandline, parameters, showwindow]";break;
 		case EW_EXECUTE:			str = DecodeExecute(ent);break;
 		case EW_GETFILETIME:		str = "!GetFileTime; 3 [file highout lowout]";break;
-		case EW_GETDLLVERSION:		str = "!GetDLLVersion: 3 [file highout lowout]";break;
+	//	case EW_GETDLLVERSION:		str = "!GetDLLVersion: 3 [file highout lowout]";break;
 	//	case EW_GETFONTVERSION:		str = "GetFontVersion: 2 [file version]";break;
-	//	case EW_GETFONTNAME:		str = "GetFontName: 2 [file fontname]";break;
+		case EW_GETFONTNAME:		str = "GetFontName: 2 [file fontname]";break;
 		case EW_REGISTERDLL:		str = DecodeCallDllFunction(ent);break;
 		case EW_CREATESHORTCUT:		str = "!Make Shortcut: 5, [link file, target file, parameters, icon file, iconindex|show mode<<8|hotkey<<16]";break;
 		case EW_COPYFILES:			str = "CopyFiles: 3 [source mask, destination location, flags]";break;

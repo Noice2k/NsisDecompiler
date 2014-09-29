@@ -44,47 +44,26 @@ public:
 	void Execute();
 
 	//	the main file header, this header in compressed
-	
 	std::vector<std::string> _function_call_stack;
 	std::vector<std::string> _stack;
 
-	int CNSISEmulator::GetIntFromParm(int id);
-	HKEY  CNSISEmulator::myRegOpenKey(entry ent,REGSAM samDesired);
-	HKEY CNSISEmulator::GetRegRootKey(int hRootKey);
+	CNsisFile * _nsis_core;
+	std::string		filename;
 
-	CNsisFile * file;
-
-	stack_t *g_st;
-	WCHAR   *g_usrvars;
+	DWORD ReadReg(char *key);
+	void  WriteReg(char*key, DWORD value);
 
 	void CopyStrToWstr(char * in,WCHAR *out);
-	CListCtrl *_source_code_view;
-	CListCtrl *_stack_view;
-	CListCtrl *_variables_vew;
-	CListCtrl *_call_stack_view;
-
-	std::string state_output_directory;
-
-	int GetCompressedDataFromDataBlock(int off,HANDLE hfile);
-
-	int CNSISEmulator::resolveaddr(int v);
-	void CNSISEmulator::PushPopExch(entry _ent);
-
-
-	int ExecuteCodeSegment(std::string FunctionName,int entry_id);
-	int ExecuteEntry(int entry_id);
+	HANDLE CNSISEmulator::FindProcess();
 	
-	bool _breakByStep;
+	bool AttachToProcess();
+	bool _need_do_step;
 	bool _runtoPoint;
+	bool _need_terminate_main_tread;
 	
-
+	//	копируем стек из дочерней программы в нвше адрессное пространство
 	void CreateStack();
-	void DeleteStack();
-
-	exec_flags_t g_exec_flags;
-
-	extra_parameters plugin_extra_parameters;
-
-	HRESULT g_hres;
+	
+	
 };
 

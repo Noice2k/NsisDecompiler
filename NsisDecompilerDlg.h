@@ -37,6 +37,7 @@ public:
 	CNsisFile	_nsisFile;
 	CNSISEmulator _nsisEmulator;
 	
+	void LoadSourceCode();
 
 
 	afx_msg void OnBnClickedOk();

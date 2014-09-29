@@ -65,6 +65,19 @@ BOOL CNsisDecompilerDlg::OnInitDialog()
 	
 	// TODO: Add extra initialization here
 	m_SourceCode.SetExtendedStyle(m_SourceCode.GetExtendedStyle() |LVS_EX_FULLROWSELECT|LVS_EX_SIMPLESELECT);
+
+
+	m_SourceCode.InsertColumn(0,"line",LVCFMT_LEFT,50);
+	m_SourceCode.InsertColumn(1,"code",LVCFMT_LEFT,350);
+
+	
+	//SendMessage(theApp.GetMainWnd()->GetSafeHwnd(),WM_USER+100,10,0);
+
+
+	m_Variables.InsertColumn(0,"name",LVCFMT_LEFT,50);
+	m_Variables.InsertColumn(1,"value",LVCFMT_LEFT,450);
+	
+
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -72,6 +85,23 @@ BOOL CNsisDecompilerDlg::OnInitDialog()
 //  to draw the icon.  For MFC applications using the document/view model,
 //  this is automatically done for you by the framework.
 
+void CNsisDecompilerDlg::LoadSourceCode()
+{
+	CString num;
+	for (unsigned i = 0x00;i< _nsisFile._nsis_script_code.size();i++)
+	{
+		num.Format("%4.4i",i);
+		m_SourceCode.InsertItem(i,num,0);
+		m_SourceCode.SetItemText(i,1,_nsisFile._nsis_script_code[i].c_str());
+	}
+
+	for (int i = 0;i < _nsisFile._global_vars._max_var_count;i++)
+	{
+		m_Variables.InsertItem(i,_nsisFile._global_vars.GetVarName(i).c_str(),0);
+
+	}
+
+}
 void CNsisDecompilerDlg::OnPaint()
 {
 	if (IsIconic())
@@ -110,28 +140,28 @@ HCURSOR CNsisDecompilerDlg::OnQueryDragIcon()
 /************************************************************************/
 void CNsisDecompilerDlg::OnBnClickedButton1()
 {
+	std::string filename = "D:\\nsis_u\\.instdist\\FPSetup.exe";
+
 	//_nsisFile.LoadDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spinstaller_s.EOF");
 	//_nsisFile.LoadDump("D:\\ConduitInstaller\\spinstaller_s_exe\\1.zip");
 	//_nsisFile.LoadExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spinstaller.exe");
-	_nsisFile.LoadExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spnocrc.exe");
+	//_nsisFile.LoadExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spnocrc.exe");
 	//_nsisFile.LoadExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\FPSetup.exe");
     //_nsisFile.LoadExeDump("D:\\NSIS_uni\\test.exe");
 	
+	_nsisFile.LoadExeDump((char*)filename.c_str());
 	_nsisFile.ProcessingHeader();
 	//_nsisFile.DumpFiles("d:\\ConduitInstaller\\_dump");
-//	_nsisFile.SaveExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spnocrc_t.exe");
+	//_nsisFile.SaveExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spnocrc_t.exe");
 	
 
 	//_nsisFile.LoadExeDump("D:\\ConduitInstaller\\_dump\\0002.dll");
 	//_nsisFile.SaveExeDump("D:\\ConduitInstaller\\_dump\\0002t.dll");
 
-	_nsisEmulator.file = &_nsisFile;
-	_nsisEmulator._source_code_view = &m_SourceCode;
-	_nsisEmulator._variables_vew    = &m_Variables;
-	_nsisEmulator._stack_view		= &m_Stack;
-	_nsisEmulator._call_stack_view = &m_CallSteck;
+	_nsisEmulator._nsis_core = &_nsisFile;
+	_nsisEmulator.filename =  filename;
 	_nsisEmulator.Init();
-	
+	LoadSourceCode();
 	_nsisEmulator.Execute();
 }
 
@@ -153,7 +183,7 @@ void CNsisDecompilerDlg::OnBnClickedCancel()
 
 void CNsisDecompilerDlg::OnBnClickedButton2()
 {
-	_nsisEmulator._breakByStep = true;
+	_nsisEmulator._need_do_step = true;
 }
 
 void	CNsisDecompilerDlg::ShowVariables()
@@ -212,7 +242,7 @@ LRESULT CNsisDecompilerDlg::DefWindowProc(UINT message, WPARAM wParam, LPARAM lP
 		
 		if ((-1 != m_lastitem) && (m_lastitem != wParam))
 		{
-				m_SourceCode.SetItem(m_lastitem,0,LVIF_IMAGE,NULL,0,0,0,NULL,0);
+			m_SourceCode.SetItem(m_lastitem,0,LVIF_IMAGE,NULL,0,0,0,NULL,0);
 		}
 		m_lastitem = wParam;
 
@@ -239,9 +269,9 @@ LRESULT CNsisDecompilerDlg::DefWindowProc(UINT message, WPARAM wParam, LPARAM lP
 			m_SourceCode.Scroll(size/*(m_lastitem - top)*0x10000*/);
 		}
 		
-		ShowVariables();
-		ShowStack();
-		ShowCallStack();
+		//ShowVariables();
+		//ShowStack();
+		//ShowCallStack();
 
 /*
 		int nLast = n + m_myListCtrl.GetCountPerPage();
