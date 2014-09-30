@@ -80,7 +80,7 @@ DWORD WINAPI ThreadProc(CONST LPVOID lpParam)
 HANDLE CNSISEmulator::FindProcess()
 {
 	HANDLE hProcessSnap;
-	HANDLE hfindProcess;
+	HANDLE hfindProcess = NULL;
 	std::string process_string;
 	PROCESSENTRY32 pe32;
 	
@@ -108,7 +108,7 @@ HANDLE CNSISEmulator::FindProcess()
 	{
 		HANDLE hProcessHandle = NULL;
 		
-		hProcessHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
+		hProcessHandle = OpenProcess(PROCESS_ALL_ACCESS , FALSE, pe32.th32ProcessID);
 		if (hProcessHandle != NULL) 
 		{
 			DWORD res = GetModuleFileNameEx(hProcessHandle, NULL, name, MAX_PATH);
@@ -137,7 +137,17 @@ HANDLE CNSISEmulator::FindProcess()
 bool CNSISEmulator::AttachToProcess()
 {
 	EnableSetDebugPrivilege();
-	HANDLE hproc = FindProcess();
+
+	CloseProcess();
+
+	STARTUPINFO cif;
+	ZeroMemory(&cif,sizeof(STARTUPINFO));
+	memset(&_debug_process_info,0,sizeof(_debug_process_info));
+	BOOL bres = CreateProcess(filename.c_str(),NULL,NULL,NULL,FALSE,0,NULL,NULL,&cif,&_debug_process_info);
+	Sleep(1000);
+
+	hproc = FindProcess();
+	/*HANDLE hproc = FindProcess();
 
 	stack_t st;
 	DWORD pst = ReadReg("vars");
@@ -146,7 +156,7 @@ bool CNSISEmulator::AttachToProcess()
 	WCHAR *uservar  = (WCHAR*) GlobalAlloc(GPTR,size);
 	
 	ReadProcessMemory(hproc,(LPVOID)pst,uservar,size,&ret);
-
+	*/
 
 	return true;
 
@@ -233,6 +243,19 @@ DWORD CNSISEmulator::ReadReg(char *key)
 }
 
 /************************************************************************/
+/*                                                                      */
+/************************************************************************/
+bool CNSISEmulator::CloseProcess()
+{
+	HANDLE proc = FindProcess();
+	while (proc!= NULL)
+	{
+		TerminateProcess(proc,0);
+		proc = FindProcess();
+	}
+	return true;
+}
+/************************************************************************/
 //
 /************************************************************************/
 void  CNSISEmulator::WriteReg(char*key, DWORD value)
@@ -248,17 +271,74 @@ void  CNSISEmulator::WriteReg(char*key, DWORD value)
 }
 
 /************************************************************************/
+//	
+/************************************************************************/
+void CNSISEmulator::ReadSteckAndVars()
+{
+	DWORD size = NSIS_MAX_STRLEN*sizeof(WCHAR)*_nsis_core->_global_vars._max_var_count;
+	DWORD ret = 0;
+	BYTE *uservar  = new BYTE[size];
+	DWORD pst = ReadReg("vars");
+	//ReadProcessMemory(_debug_process_info.hProcess,(LPVOID)pst,uservar,size,&ret);
+	BOOL res = ReadProcessMemory(hproc,(LPVOID)pst,uservar,size,&ret);
+	if (ret == size)
+	{
+		CFile file;
+		file.Open("d:\\dump.txt",CFile::modeCreate|CFile::modeWrite,NULL);
+		file.Write(uservar,size);
+		file.Close();
+		for (int i = 0x00;i < _nsis_core->_global_vars._max_var_count;i++)
+		{
+			byte * pp = uservar+ i*(NSIS_MAX_STRLEN*sizeof(WCHAR))+i*8;
+			WCHAR *w = (WCHAR*)(uservar+ i*(NSIS_MAX_STRLEN*sizeof(WCHAR))+i*8);
+			std::string str(w,w+lstrlenW(w));
+			_nsis_core->_global_vars.SetVarValue(i,str);
+			
+		}
+	}
+	delete uservar;
+	_stack.resize(0);
+
+	stack_t stack;
+	pst = ReadReg("stack");
+	
+	while (pst != true)
+	{
+		size = sizeof(stack_t);
+		res = ReadProcessMemory(hproc,(LPVOID)pst,&stack,size,&ret);
+		if (ret == size)
+		{
+			pst = (DWORD)stack.next;
+			WCHAR *w = (WCHAR*)stack.text;
+			std::string str(w,w+lstrlenW(w));
+			_stack.push_back(str);
+
+		}
+		else
+		{
+			break;
+		}
+	}
+	
+}
+/************************************************************************/
 //	основной цикл программы
 /************************************************************************/
 void CNSISEmulator::Run()
 {
+	DWORD last_code_position = 0;
 
 	//	крутимся в цикле
 	while ( false == _need_terminate_main_tread )
 	{
 		// read the current point
 		DWORD pos = ReadReg("pos");
-		SendMessage(theApp.GetMainWnd()->GetSafeHwnd(),WM_USER+100,(WPARAM)pos,0);
+		if (pos != last_code_position)
+		{
+			last_code_position = pos;
+			ReadSteckAndVars();
+			SendMessage(theApp.GetMainWnd()->GetSafeHwnd(),WM_USER+100,(WPARAM)pos,0);
+		}
 		if (_need_do_step == true)
 		{
 			//	write do step
@@ -267,7 +347,7 @@ void CNSISEmulator::Run()
 		}
 		else
 		{
-			Sleep(100);
+			Sleep(1);
 		}
 	}
 	

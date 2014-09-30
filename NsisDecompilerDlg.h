@@ -55,4 +55,5 @@ public:
 	int m_lastitem;
 	afx_msg void OnBnClickedButton2();
 	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
+	afx_msg void OnBnClickedButton3();
 };

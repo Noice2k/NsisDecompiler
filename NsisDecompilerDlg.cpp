@@ -38,6 +38,7 @@ BEGIN_MESSAGE_MAP(CNsisDecompilerDlg, CDialogEx)
 	ON_BN_CLICKED(IDOK, &CNsisDecompilerDlg::OnBnClickedOk)
 	ON_BN_CLICKED(IDCANCEL, &CNsisDecompilerDlg::OnBnClickedCancel)
 	ON_BN_CLICKED(IDC_BUTTON2, &CNsisDecompilerDlg::OnBnClickedButton2)
+	ON_BN_CLICKED(IDC_BUTTON3, &CNsisDecompilerDlg::OnBnClickedButton3)
 END_MESSAGE_MAP()
 
 
@@ -72,6 +73,10 @@ BOOL CNsisDecompilerDlg::OnInitDialog()
 
 	
 	//SendMessage(theApp.GetMainWnd()->GetSafeHwnd(),WM_USER+100,10,0);
+
+	m_Stack.InsertColumn(0,"id",LVCFMT_LEFT,50);
+	m_Stack.InsertColumn(1,"value",LVCFMT_LEFT,450);
+
 
 
 	m_Variables.InsertColumn(0,"name",LVCFMT_LEFT,50);
@@ -142,6 +147,10 @@ void CNsisDecompilerDlg::OnBnClickedButton1()
 {
 	std::string filename = "D:\\nsis_u\\.instdist\\FPSetup.exe";
 
+	_nsisEmulator._nsis_core = &_nsisFile;
+	_nsisEmulator.filename =  filename;
+	_nsisEmulator.CloseProcess();
+
 	//_nsisFile.LoadDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spinstaller_s.EOF");
 	//_nsisFile.LoadDump("D:\\ConduitInstaller\\spinstaller_s_exe\\1.zip");
 	//_nsisFile.LoadExeDump("D:\\ConduitInstaller\\spinstaller_s_exe\\spinstaller.exe");
@@ -158,8 +167,6 @@ void CNsisDecompilerDlg::OnBnClickedButton1()
 	//_nsisFile.LoadExeDump("D:\\ConduitInstaller\\_dump\\0002.dll");
 	//_nsisFile.SaveExeDump("D:\\ConduitInstaller\\_dump\\0002t.dll");
 
-	_nsisEmulator._nsis_core = &_nsisFile;
-	_nsisEmulator.filename =  filename;
 	_nsisEmulator.Init();
 	LoadSourceCode();
 	_nsisEmulator.Execute();
@@ -198,9 +205,6 @@ void	CNsisDecompilerDlg::ShowVariables()
 void	CNsisDecompilerDlg::ShowStack()
 {
 	m_Stack.DeleteAllItems();
-	m_Stack.InsertColumn(0,"id",LVCFMT_LEFT,50);
-	m_Stack.InsertColumn(1,"value",LVCFMT_LEFT,450);
-
 	CString num;
 	for (unsigned i = 0x00;i< _nsisEmulator._stack.size();i++)
 	{
@@ -269,8 +273,8 @@ LRESULT CNsisDecompilerDlg::DefWindowProc(UINT message, WPARAM wParam, LPARAM lP
 			m_SourceCode.Scroll(size/*(m_lastitem - top)*0x10000*/);
 		}
 		
-		//ShowVariables();
-		//ShowStack();
+		ShowVariables();
+		ShowStack();
 		//ShowCallStack();
 
 /*
@@ -286,4 +290,12 @@ LRESULT CNsisDecompilerDlg::DefWindowProc(UINT message, WPARAM wParam, LPARAM lP
 	}
 
 	return CDialogEx::DefWindowProc(message, wParam, lParam);
+}
+
+
+void CNsisDecompilerDlg::OnBnClickedButton3()
+{
+	_nsisEmulator._need_do_step_out = true;
+	_nsisEmulator._need_do_step = true;
+	
 }

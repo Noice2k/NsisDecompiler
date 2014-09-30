@@ -34,3 +34,6 @@ lang_table[x]  = offeset in
 
 global_wars[0] - path
 global_wars[1] - $0
+
+
+the main magic to make the normal build to the debug build is exstract "nsis part [header,sections,files]" and put to the debug buld;

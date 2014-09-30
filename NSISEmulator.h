@@ -55,11 +55,16 @@ public:
 
 	void CopyStrToWstr(char * in,WCHAR *out);
 	HANDLE CNSISEmulator::FindProcess();
-	
+	void ReadSteckAndVars();
 	bool AttachToProcess();
+	bool CloseProcess();
 	bool _need_do_step;
+	bool _need_do_step_out;
 	bool _runtoPoint;
 	bool _need_terminate_main_tread;
+
+	HANDLE hproc;
+	PROCESS_INFORMATION		_debug_process_info;
 	
 	//	копируем стек из дочерней программы в нвше адрессное пространство
 	void CreateStack();
