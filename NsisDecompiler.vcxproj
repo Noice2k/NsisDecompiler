@@ -110,10 +110,12 @@
     <ClInclude Include="GlobalVars.h" />
     <ClInclude Include="Header.h" />
     <ClInclude Include="LZMA.h" />
+    <ClInclude Include="MD5Sum.h" />
     <ClInclude Include="NsisDecompiler.h" />
     <ClInclude Include="NsisDecompilerDlg.h" />
     <ClInclude Include="NSISEmulator.h" />
-    <ClInclude Include="NsisFile.h" />
+    <ClInclude Include="NsisCore.h" />
+    <ClInclude Include="PEFile.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
@@ -123,10 +125,12 @@
     <ClCompile Include="Compressor.cpp" />
     <ClCompile Include="GlobalVars.cpp" />
     <ClCompile Include="LZMA.cpp" />
+    <ClCompile Include="MD5Sum.cpp" />
     <ClCompile Include="NsisDecompiler.cpp" />
     <ClCompile Include="NsisDecompilerDlg.cpp" />
     <ClCompile Include="NSISEmulator.cpp" />
-    <ClCompile Include="NsisFile.cpp" />
+    <ClCompile Include="NsisCore.cpp" />
+    <ClCompile Include="PEFile.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

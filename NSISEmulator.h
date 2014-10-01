@@ -2,7 +2,7 @@
 #include "GlobalVars.h"
 #include <vector>
 #include <string>
-#include "NsisFile.h"
+#include "NsisCore.h"
 #include "Header.h"
 
 #ifndef NSISCALL
@@ -47,7 +47,7 @@ public:
 	std::vector<std::string> _function_call_stack;
 	std::vector<std::string> _stack;
 
-	CNsisFile * _nsis_core;
+	CNsisCore * _nsis_core;
 	std::string		filename;
 
 	DWORD ReadReg(char *key);

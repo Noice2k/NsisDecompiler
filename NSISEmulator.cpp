@@ -26,11 +26,7 @@ CNSISEmulator::~CNSISEmulator(void)
 }
 
 
-void CNSISEmulator::Init()
-{
 
-
-}
 
 void EnableSetDebugPrivilege()
 {
@@ -302,7 +298,7 @@ void CNSISEmulator::ReadSteckAndVars()
 	stack_t stack;
 	pst = ReadReg("stack");
 	
-	while (pst != true)
+	while (pst != 0)
 	{
 		size = sizeof(stack_t);
 		res = ReadProcessMemory(hproc,(LPVOID)pst,&stack,size,&ret);

@@ -3,9 +3,11 @@
 //
 
 #pragma once
-#include "NsisFile.h"
 #include "afxcmn.h"
+#include "NsisCore.h"
 #include "NSISEmulator.h"
+#include "PEFile.h"
+#include "afxwin.h"
 
 // CNsisDecompilerDlg dialog
 class CNsisDecompilerDlg : public CDialogEx
@@ -33,11 +35,19 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnBnClickedButton1();
-	//	 file processor
-	CNsisFile	_nsisFile;
+	
+	
+	//	nsis core 
+	CNsisCore	_nsis_core;
+	//	nsis debug engine
 	CNSISEmulator _nsisEmulator;
+	//	pe file
+	CPEFile		_pe_file;
+
 	
 	void LoadSourceCode();
+
+	
 
 
 	afx_msg void OnBnClickedOk();
@@ -56,4 +66,6 @@ public:
 	afx_msg void OnBnClickedButton2();
 	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 	afx_msg void OnBnClickedButton3();
+	CEdit m_EditFileName;
+	afx_msg void OnBnClickedButton4();
 };

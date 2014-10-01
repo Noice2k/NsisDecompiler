@@ -1,191 +1,30 @@
 #include "stdafx.h"
-#include "NsisFile.h"
+#include "NsisCore.h"
 #include "crc32.h"
 
-CNsisFile::CNsisFile(void)
+CNsisCore::CNsisCore(void)
 {
 }
 
 
-CNsisFile::~CNsisFile(void)
+CNsisCore::~CNsisCore(void)
 {
 }
 
-/************************************************************************/
-// this is based on the (slow,small) CRC32 implementation from zlib.
-/************************************************************************/
-DWORD CNsisFile::PE_CRC(DWORD  crc, const unsigned char *buf, unsigned int len)
-{
-	crc = 0;
-	WORD * w = (WORD*) buf;
-	unsigned  wl = len/2;
-
-	while (wl > 0 )
-	{
-		crc += *w;
-		w++;
-		wl--;
-		crc = (crc&0xffff) + (crc>>16);
-	}
-	crc = (crc&0xffff) + (crc>>16);
-	return crc;	
-}
 
 // Macro to find the offset of a field of a structure
 #ifndef offsetof
 #define offsetof(st, m) ((size_t) ( (char *)&((st *)(0))->m - (char *)0 ))
 #endif
 
-// NT Signature + IMAGE_FILE_HEADER + Most of IMAGE_OPTIONAL_HEADER
-// This is relative to the PE Header Offset
-#define CHECKSUM_OFFSET sizeof(DWORD)+sizeof(IMAGE_FILE_HEADER)+offsetof(IMAGE_OPTIONAL_HEADER, CheckSum)
 
-
-//////////////////////////////////////////////////////////////////////////
-//	exe file dump
-// [IMAGE_DOS_HEADER .e_lfanew offset to the IMAGE_NT_HEADERS][DOS stub][IMAGE_NT_HEADERS]
-// [IMAGE_SECTION_HEADER * IMAGE_NT_HEADERS.IMAGE_FILE_HEADER.NumberOfSections]
-// [Sections * IMAGE_NT_HEADERS.IMAGE_FILE_HEADER.NumberOfSections]
-//		-	offet - IMAGE_SECTION_HEADER.PointerToRawData; size -  IMAGE_SECTION_HEADER.SizeOfRawData
-//	[.text]		- executable code
-//	[.rdata]	- resource data
-//	[.data]		- initializing data
-//  [.rsec]		- resource table 
-//	[nsis data]
-//	[certificate table] - IMAGE_NT_HEADERS.IMAGE_OPTIONAL_HEADER.DataDirectory[4]
-//				Certificate table address and size
-
-/************************************************************************/
-//	load exe dump
-/************************************************************************/
-void    CNsisFile::LoadExeDump(char * filename)
-{
-	_pe_full_dump.resize(0);
-	CFile file;
-	if (TRUE == file.Open(filename,CFile::modeRead,NULL))
-	{
-		int length = (int)file.GetLength();
-		_pe_full_dump.resize(length+1);
-		file.Read(&_pe_full_dump[0],length);
-		file.Close();
-	}
-	if (_pe_full_dump.size() == 0)
-	{
-		return;
-	}
-
-	
-
-	int off = 0;
-	//	copy dos header
-	memcpy(&_pe_dos_header,&_pe_full_dump[off],sizeof(_pe_dos_header));
-	off +=_pe_dos_header.e_lfanew;
-	//	copy ms dos stab
-	_pe_msdos_stub.insert(_pe_msdos_stub.begin(),&_pe_full_dump[sizeof(_pe_dos_header)],&_pe_full_dump[off]);
-	//	copy nt header
-	memcpy(&_pe_nt_header,&_pe_full_dump[off],sizeof(_pe_nt_header));
-
-	
-
-	DWORD oldcrc = _pe_nt_header.OptionalHeader.CheckSum;
-	_pe_nt_header.OptionalHeader.CheckSum = 0;
-	memcpy(&_pe_full_dump[off],&_pe_nt_header,sizeof(_pe_nt_header));
-	off+= sizeof(_pe_nt_header);
-
-	
-	//	copy section header
-	int count = _pe_nt_header.FileHeader.NumberOfSections;
-	for (int i= 0x00;i<count;i++)
-	{
-		IMAGE_SECTION_HEADER ish  = *(IMAGE_SECTION_HEADER*)&_pe_full_dump[off];
-		off+= sizeof(IMAGE_SECTION_HEADER);
-		_pe_section_headers.push_back(ish);
-	}
-	//	copy the section data
-	unsigned soff = 0;
-	unsigned ssize = 0;
-	unsigned nsisoff = 0;
-	for (unsigned i= 0x00;i<_pe_section_headers.size();i++)
-	{
-		IMAGE_SECTION_HEADER ish = _pe_section_headers[i];
-		soff = ish.PointerToRawData;
-		ssize = ish.SizeOfRawData;
-		DWORD sname = *(DWORD*)&ish.Name[0];
-		switch (sname)
-		{
-		// .tex
-		case 0x7865742e:
-			{
-				_pe_dot_text_section.insert(_pe_dot_text_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
-				nsisoff = max(soff+ssize,nsisoff);
-			}
-			break;
-		case 0x6164722e:
-			{
-				_pe_dot_rdata_section.insert(_pe_dot_rdata_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
-				nsisoff = max(soff+ssize,nsisoff);
-			}
-			break;
-		case 0x7461642e:
-			{
-				_pe_dot_data_section.insert(_pe_dot_data_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
-				nsisoff = max(soff+ssize,nsisoff);
-			}
-			break;
-		case 0x7273722e:
-			{
-				_pe_dot_rsrc_section.insert(_pe_dot_rsrc_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
-				nsisoff = max(soff+ssize,nsisoff);
-			}
-			break;
-		case 0x6c65722e:
-			{
-				_pe_dot_reloc_section.insert(_pe_dot_reloc_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
-				nsisoff = max(soff+ssize,nsisoff+ssize);
-			}
-			break;
-		case 0x61646e2e:
-			{
-				int c = ish.Misc.VirtualSize;
-				c/= (NSIS_MAX_STRLEN*sizeof(WCHAR));
-				_global_vars.SetVarCount(c);
-			}
-			break;
-		default:
-			break;
-		}
-	}
-	
-	unsigned nsissize = 0;
-	//	load nsis data;
-	if (_pe_nt_header.OptionalHeader.DataDirectory[4].VirtualAddress > 0)
-	{
-		nsissize = _pe_nt_header.OptionalHeader.DataDirectory[4].VirtualAddress - nsisoff;
-	}
-	else
-	{
-		nsissize = _pe_full_dump.size()-1-nsisoff;
-	}
-	_dump.insert(_dump.begin(),&_pe_full_dump[nsisoff],&_pe_full_dump[nsisoff+nsissize]);
-
-	//  copy certificate table;
-	soff = _pe_nt_header.OptionalHeader.DataDirectory[4].VirtualAddress;
-	ssize = _pe_nt_header.OptionalHeader.DataDirectory[4].Size;
-	ssize = min(ssize,_pe_full_dump.size()-1 - soff);
-	_pe_certificatr_table.insert(_pe_certificatr_table.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
-
-/*//	.text 
-	//	Certificate tabel 
-	std::vector<byte> _certificatr_table;
-	*/
-}
 
 /************************************************************************/
 //	save exe dump afer changes
 /************************************************************************/
-void	CNsisFile::SaveExeDump(char * filename)
+void	CNsisCore::SaveExeDump(char * filename)
 {
-	//	выходной буфер
+/*	//	выходной буфер
 	std::vector<byte> _out;
 	byte * p = (byte*)&_pe_dos_header;
 	//	dos header
@@ -265,7 +104,7 @@ void	CNsisFile::SaveExeDump(char * filename)
 	
 
 	/**/
-	
+	/*
 	_crc_offset = CHECKSUM_OFFSET;
 	DWORD crc = PE_CRC(0,&_out[0],_out.size());
 
@@ -282,28 +121,22 @@ void	CNsisFile::SaveExeDump(char * filename)
 	file.Open(filename,CFile::modeCreate|CFile::modeWrite,NULL);
 	file.Write(&_out[0],_out.size());
 	file.Close();
+	*/
 }
 
 
 /************************************************************************/
 //	load dump
 /************************************************************************/
-void CNsisFile::LoadDump(char * filename)
+void CNsisCore::SetNsisDump(std::vector<byte> *source)
 {
-	CFile file;
-	if (TRUE == file.Open(filename,CFile::modeRead,NULL))
-	{
-		int length = (int)file.GetLength();
-		_dump.resize(length);
-		file.Read(&_dump[0],length);
-		file.Close();
-	}
+	_dump = *source;
 }
 
 /************************************************************************/
 //	save all nsis files to disk
 /************************************************************************/
-void	CNsisFile::DumpFiles(char * path)
+void	CNsisCore::DumpFiles(char * path)
 {
 	for (unsigned i = 0;i < _nsis_files.size(); i++)
 	{
@@ -325,7 +158,7 @@ void	CNsisFile::DumpFiles(char * path)
 /************************************************************************/
 //	processing header
 /************************************************************************/
-bool	CNsisFile::ProcessingHeader()
+bool	CNsisCore::ProcessingHeader()
 {
 	if (_dump.size() <  (sizeof (firstheader) + sizeof(header))) return false;
 	memcpy(&_firstheader,&_dump[0],sizeof(firstheader));
@@ -424,7 +257,7 @@ bool	CNsisFile::ProcessingHeader()
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-bool CNsisFile::LoadEntries()
+bool CNsisCore::LoadEntries()
 {
 	int offset	= _globalheader.blocks[NB_ENTRIES].offset;
 	int count	= _globalheader.blocks[NB_ENTRIES].num;
@@ -441,7 +274,7 @@ bool CNsisFile::LoadEntries()
 /************************************************************************/
 //
 /************************************************************************/
-void CNsisFile::FunctionFormatText(int entstart,std::string functiontype, std::string name)
+void CNsisCore::FunctionFormatText(int entstart,std::string functiontype, std::string name)
 {
 
 	std::string str = ""+functiontype+" "+ name + "  ";
@@ -469,7 +302,7 @@ void CNsisFile::FunctionFormatText(int entstart,std::string functiontype, std::s
 /************************************************************************/
 //
 /************************************************************************/
-void CNsisFile::ProcessingFunctions()
+void CNsisCore::ProcessingFunctions()
 {
 	// function on Init
 	if (_globalheader.code_onInit >= 0)
@@ -513,7 +346,7 @@ void CNsisFile::ProcessingFunctions()
 /************************************************************************/
 //	load page structs
 /************************************************************************/
-bool CNsisFile::LoadPages()
+bool CNsisCore::LoadPages()
 {
 	int offset	= _globalheader.blocks[NB_PAGES].offset;
 	int count	= _globalheader.blocks[NB_PAGES].num;
@@ -530,7 +363,7 @@ bool CNsisFile::LoadPages()
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-bool CNsisFile::LoadSection()
+bool CNsisCore::LoadSection()
 {
 	int offset	= _globalheader.blocks[NB_SECTIONS].offset;
 	int count	= _globalheader.blocks[NB_SECTIONS].num;
@@ -548,7 +381,7 @@ bool CNsisFile::LoadSection()
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-bool CNsisFile::LoadStrings()
+bool CNsisCore::LoadStrings()
 {
 	int offset	= _globalheader.blocks[NB_STRINGS].offset;
 	int count	= (_globalheader.blocks[NB_LANGTABLES].offset  - _globalheader.blocks[NB_STRINGS].offset)/2;
@@ -562,7 +395,7 @@ bool CNsisFile::LoadStrings()
 /************************************************************************/
 //	
 /************************************************************************/
-bool CNsisFile::LoadLandTables()
+bool CNsisCore::LoadLandTables()
 {
 	int offset	= _globalheader.blocks[NB_LANGTABLES].offset + sizeof(LANGID)+2*sizeof(int);
 	int count	= (_globalheader.langtable_size)/4;
@@ -615,7 +448,7 @@ const TCHAR QUICKLAUNCH[] = _T("\\Microsoft\\Internet Explorer\\Quick Launch");
 
 // The value of registry->sub->name is stored in out.  If failure, then out becomes
 // an empty string "".
-void CNsisFile::myRegGetStr(HKEY root, const TCHAR *sub, const TCHAR *name, TCHAR *out, int x64)
+void CNsisCore::myRegGetStr(HKEY root, const TCHAR *sub, const TCHAR *name, TCHAR *out, int x64)
 {
 	HKEY hKey;
 	*out=0;
@@ -634,7 +467,7 @@ void CNsisFile::myRegGetStr(HKEY root, const TCHAR *sub, const TCHAR *name, TCHA
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-std::string CNsisFile::GetNsisString(int offset,bool isvalue)
+std::string CNsisCore::GetNsisString(int offset,bool isvalue)
 {
 	std::wstring wstr;
 
@@ -814,7 +647,7 @@ std::string CNsisFile::GetNsisString(int offset,bool isvalue)
 /************************************************************************/
 //  decode push/pop string
 /************************************************************************/
-std::string CNsisFile::DecodePushPop(entry ent)
+std::string CNsisCore::DecodePushPop(entry ent)
 {
 	char buff[0x100];
 
@@ -848,7 +681,7 @@ std::string CNsisFile::DecodePushPop(entry ent)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-std::string CNsisFile::DecodeAssign(entry ent)
+std::string CNsisCore::DecodeAssign(entry ent)
 {
 	std::string var = _global_vars.GetVarName(ent.offsets[0]);
 	std::string text = GetNsisString(ent.offsets[1]);
@@ -861,7 +694,7 @@ std::string CNsisFile::DecodeAssign(entry ent)
 /************************************************************************/
 //	decode IntOp 
 /************************************************************************/
-std::string CNsisFile::DecodeIntOp(entry ent)
+std::string CNsisCore::DecodeIntOp(entry ent)
 {
 	//
 	std::string str;
@@ -893,7 +726,7 @@ std::string CNsisFile::DecodeIntOp(entry ent)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-std::string CNsisFile::GetStringFromParm(entry ent,int id_,bool isvalue)
+std::string CNsisCore::GetStringFromParm(entry ent,int id_,bool isvalue)
 {
 	int id = id_ < 0 ? -id_ : id_;
 	std::string str = GetNsisString( ent.offsets[id & 0xF],isvalue);
@@ -903,7 +736,7 @@ std::string CNsisFile::GetStringFromParm(entry ent,int id_,bool isvalue)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-std::string CNsisFile::DecodeStrCmp(entry ent)
+std::string CNsisCore::DecodeStrCmp(entry ent)
 {
 	std::string str;
 	std::string var1 = GetStringFromParm(ent,0x20);
@@ -924,7 +757,7 @@ std::string CNsisFile::DecodeStrCmp(entry ent)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-std::string CNsisFile::DecodeNopJump(entry ent)
+std::string CNsisCore::DecodeNopJump(entry ent)
 {
 	//" Nop/Jump, do nothing: 1, [?new address+1:advance one]"
 	
@@ -945,7 +778,7 @@ std::string CNsisFile::DecodeNopJump(entry ent)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-std::string CNsisFile::DecodeExtractFile(entry ent)
+std::string CNsisCore::DecodeExtractFile(entry ent)
 {
 	//	"File to extract: 6 [overwriteflag, output filename, compressed filedata, filedatetimelow, filedatetimehigh, allow ignore] overwriteflag: 0x1 = no. 0x0=force, 0x2=try, 0x3=if date is newer"
 	std::string name = GetStringFromParm(ent,0x31);
@@ -968,7 +801,7 @@ std::string CNsisFile::DecodeExtractFile(entry ent)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-std::string CNsisFile::DecodeFileOperation(entry ent)
+std::string CNsisCore::DecodeFileOperation(entry ent)
 {
 	std::string str ;
 	std::string handle = _global_vars.GetVarName(ent.offsets[0]);
@@ -1056,7 +889,7 @@ std::string CNsisFile::DecodeFileOperation(entry ent)
 /************************************************************************/
 //
 /************************************************************************/
-std::string CNsisFile::DecodeCall(entry ent)
+std::string CNsisCore::DecodeCall(entry ent)
 {
 
 	int newent = ent.offsets[0];
@@ -1089,7 +922,7 @@ std::string CNsisFile::DecodeCall(entry ent)
 /************************************************************************/
 //	
 /************************************************************************/
-std::string CNsisFile::DecodeIfFileExists(entry ent)
+std::string CNsisCore::DecodeIfFileExists(entry ent)
 {
 	//	"IfFileExists: 3, [file name, jump amount if exists, jump amount if not exists]"
 	char buff[0x100];
@@ -1101,7 +934,7 @@ std::string CNsisFile::DecodeIfFileExists(entry ent)
 /************************************************************************/
 //	
 /************************************************************************/
-std::string CNsisFile::DecodeCallDllFunction(entry ent)
+std::string CNsisCore::DecodeCallDllFunction(entry ent)
 {
 	// 
 	std::string str = "Call_Dll_Function " + GetNsisString(ent.offsets[0]) + ":" + GetNsisString(ent.offsets[1]);
@@ -1119,7 +952,7 @@ std::string CNsisFile::DecodeCallDllFunction(entry ent)
 /************************************************************************/
 //	
 /************************************************************************/
-std::string CNsisFile::DecodeExecute(entry ent)
+std::string CNsisCore::DecodeExecute(entry ent)
 {
 	//	"Execute program: 3,[complete command line,waitflag,>=0?output errorcode"
 	std::string str;
@@ -1138,7 +971,7 @@ std::string CNsisFile::DecodeExecute(entry ent)
 /************************************************************************/
 //
 /************************************************************************/
-std::string CNsisFile::DecodeStrLen(entry ent)
+std::string CNsisCore::DecodeStrLen(entry ent)
 {
 	std::string str = "StrLen "  + _global_vars.GetVarName(ent.offsets[0]) + " " + GetNsisString(ent.offsets[1]);
 	return str;
@@ -1147,7 +980,7 @@ std::string CNsisFile::DecodeStrLen(entry ent)
 /************************************************************************/
 //
 /************************************************************************/
-std::string CNsisFile::DecodeIfFlag(entry ent)
+std::string CNsisCore::DecodeIfFlag(entry ent)
 {
 	char buff[0x100];	
 	//	"!If a flag: 4 [on, off, id, new value mask]"
@@ -1164,7 +997,7 @@ std::string CNsisFile::DecodeIfFlag(entry ent)
 /************************************************************************/
 //
 /************************************************************************/
-std::string CNsisFile::DecodeSetFlag(entry ent)
+std::string CNsisCore::DecodeSetFlag(entry ent)
 {
 	std::string str;
 	switch (ent.offsets[0])
@@ -1194,7 +1027,7 @@ std::string CNsisFile::DecodeSetFlag(entry ent)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-std::string CNsisFile::DecodeIntCmp(entry ent)
+std::string CNsisCore::DecodeIntCmp(entry ent)
 {
 	// "IntCmp: 6 [val1, val2, equal, val1<val2, val1>val2, unsigned?]"
 	std::string var1 = GetStringFromParm(ent,0x20);
@@ -1214,7 +1047,7 @@ std::string CNsisFile::DecodeIntCmp(entry ent)
 /************************************************************************/
 //
 /************************************************************************/
-std::string CNsisFile::DecodeIntFmt(entry ent)
+std::string CNsisCore::DecodeIntFmt(entry ent)
 {
 	char buff[0x1000];
 	std::string str = GetNsisString(ent.offsets[1]);
@@ -1226,7 +1059,7 @@ std::string CNsisFile::DecodeIntFmt(entry ent)
 /************************************************************************/
 //
 /************************************************************************/
-std::string CNsisFile::DecodeFindFiles(entry ent)
+std::string CNsisCore::DecodeFindFiles(entry ent)
 {
 	std::string str;
 	if (ent.which == EW_FINDFIRST)
@@ -1276,7 +1109,7 @@ const TCHAR * _RegKeyHandleToName(HKEY hKey)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-std::string CNsisFile::DecodeReadRegStr(entry ent)
+std::string CNsisCore::DecodeReadRegStr(entry ent)
 {
 	//	"!ReadRegStr: 5 [output, rootkey(int), keyname, itemname, ==1?int::str]"
 	std::string var  = _global_vars.GetVarName(ent.offsets[0]);
@@ -1298,7 +1131,7 @@ std::string CNsisFile::DecodeReadRegStr(entry ent)
 /************************************************************************/
 //	
 /************************************************************************/
-std::string CNsisFile::DecodeCreateDir(entry ent)
+std::string CNsisCore::DecodeCreateDir(entry ent)
 {
 	std::string  path = "CreateDirectory "+ GetNsisString(ent.offsets[0]);
 	if (ent.offsets[1])
@@ -1312,7 +1145,7 @@ std::string CNsisFile::DecodeCreateDir(entry ent)
 /************************************************************************/
 //
 /************************************************************************/
-std::string CNsisFile::DecodeDeleteFile(entry ent)
+std::string CNsisCore::DecodeDeleteFile(entry ent)
 {
 	std::string str = "Delete " +  GetNsisString(ent.offsets[0]) + " ;";
 	str+= ent.offsets[1] & 0x01 ? "DEL_DIR | " : "";
@@ -1333,7 +1166,7 @@ std::string CNsisFile::DecodeDeleteFile(entry ent)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-std::string CNsisFile::DecodeSleep(entry ent)
+std::string CNsisCore::DecodeSleep(entry ent)
 {
 	char buff[0x100];
 	//	"!Sleep: 1 [sleep time in milliseconds]"
@@ -1344,7 +1177,7 @@ std::string CNsisFile::DecodeSleep(entry ent)
 /************************************************************************/
 //	
 /************************************************************************/
-std::string CNsisFile::DecodeGetTempFileName(entry ent)
+std::string CNsisCore::DecodeGetTempFileName(entry ent)
 {
 	std::string str = "GetTempFileName " + _global_vars.GetVarName(ent.offsets[0]) + " " +  GetNsisString(ent.offsets[1]);
 	//	"!GetTempFileName: 2 [output, base_dir]"
@@ -1354,7 +1187,7 @@ std::string CNsisFile::DecodeGetTempFileName(entry ent)
 /************************************************************************/
 //
 /************************************************************************/
-std::string CNsisFile::DecodeMessageBox(entry ent)
+std::string CNsisCore::DecodeMessageBox(entry ent)
 {
 
 	#define MBD(x) {x,_T(#x)},
@@ -1404,7 +1237,7 @@ std::string CNsisFile::DecodeMessageBox(entry ent)
 	return str;
 }
 
-std::string CNsisFile::EntryToString(entry ent)
+std::string CNsisCore::EntryToString(entry ent)
 {
 	std::string str;
 	switch ( ent.which)
@@ -1493,7 +1326,7 @@ std::string CNsisFile::EntryToString(entry ent)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-void CNsisFile::ProcessingEntries()
+void CNsisCore::ProcessingEntries()
 {
 	
 	char buff[0x10];
