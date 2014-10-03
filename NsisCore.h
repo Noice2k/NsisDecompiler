@@ -29,6 +29,7 @@ public:
 
 	//	load dump
 	void	SetNsisDump(std::vector<byte> *source);
+
 	
 	
 	//	save all nsis files to disk

@@ -146,12 +146,13 @@ HCURSOR CNsisDecompilerDlg::OnQueryDragIcon()
 /************************************************************************/
 void CNsisDecompilerDlg::OnBnClickedButton1()
 {
+
 	CString filename;
 	m_EditFileName.GetWindowText(filename);
 	theApp.WriteProfileString("main","last_used_file",filename);
 
 	if (true == filename.IsEmpty())
-	{\
+	{
 		return;
 	}
 
@@ -162,19 +163,27 @@ void CNsisDecompilerDlg::OnBnClickedButton1()
 	CPEFile source_pe;
 	CPEFile dest_pe;
 
+	// load the test file
 	if (source_pe.LoadAndParseFile(filename.GetBuffer()))
 	{
+
+		std::string str2 = source_pe.GetDumpHash();
+
+		//	this is nsis "Nullsoft Install System v2.46.1-Unicode lzma_solid stub"  ?
 		std::string str = source_pe.GetCodeSegmentHash();
-		//	this is nsis "Nullsoft Install System v2.46.1-Unicode lzma_solid stub" 
+		
 		if (str == "3291075913c14a1799655a261fb21cca")
 		{
-			if (dest_pe.LoadAndParseFile("D:\\Nsis_debug\\stubs\\unicode_2.46.1_s\\lzma_solid"))
+			//	load the "Nullsoft Install System v2.46.1-Unicode lzma_solid stub with debug code"
+			if (dest_pe.LoadAndParseFile("D:\\Nsis_debug\\stubs\\2.46.1_unicode_debug\\lzma_solid"))
 			{
-				std::string str2 = dest_pe.GetCodeSegmentHash();
-				dest_pe.SetEofSegnemt(source_pe.GetEOFSegnemt(),source_pe.GetNDataSize());
+				dest_pe.ReplaceTextSegment(&source_pe);
+				//source_pe.ReplaceTextSegment(&dest_pe);
 				filename+="_dbg.exe";
+				//source_pe.SaveExeDump(filename.GetBuffer());
 				dest_pe.SaveExeDump(filename.GetBuffer());
-			}
+				str2 = dest_pe.GetDumpHash();
+			} 
 		}
 	}
 
@@ -189,7 +198,6 @@ void CNsisDecompilerDlg::OnBnClickedButton1()
 		LoadSourceCode();
 		_nsisEmulator.Execute();
 	}
-
 }
 
 

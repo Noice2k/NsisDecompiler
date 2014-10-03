@@ -94,39 +94,49 @@ bool	CPEFile::LoadAndParseFile(char * filename)
 		DWORD sname = *(DWORD*)&ish.Name[0];
 		switch (sname)
 		{
-			// .tex
+			// .text
 		case 0x7865742e:
 			{
+				_text_header = &_pe_section_headers[i];
 				_pe_dot_text_section.insert(_pe_dot_text_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
 				nsisoff = max(soff+ssize,nsisoff);
 			}
 			break;
+			// .rdata
 		case 0x6164722e:
 			{
+				_rdata_header = &_pe_section_headers[i];
 				_pe_dot_rdata_section.insert(_pe_dot_rdata_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
 				nsisoff = max(soff+ssize,nsisoff);
 			}
 			break;
+			// .data
 		case 0x7461642e:
 			{
+				_data_header = &_pe_section_headers[i];
 				_pe_dot_data_section.insert(_pe_dot_data_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
 				nsisoff = max(soff+ssize,nsisoff);
 			}
 			break;
+			// .rsrc
 		case 0x7273722e:
 			{
+				_rsrc_header = &_pe_section_headers[i];
 				_pe_dot_rsrc_section.insert(_pe_dot_rsrc_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
 				nsisoff = max(soff+ssize,nsisoff);
 			}
 			break;
+			// .reloc
 		case 0x6c65722e:
 			{
 				_pe_dot_reloc_section.insert(_pe_dot_reloc_section.begin(),&_pe_full_dump[soff],&_pe_full_dump[soff+ssize]);
 				nsisoff = max(soff+ssize,nsisoff+ssize);
 			}
 			break;
+			// .ndata
 		case 0x61646e2e:
 			{
+				_ndata_header  =  &_pe_section_headers[i];
 				_ndata_size = ish.Misc.VirtualSize;
 				/*
 				int c = ish.Misc.VirtualSize;
@@ -247,21 +257,35 @@ void CPEFile::SaveExeDump(char * filename)
 		{
 			// .tex
 		case 0x7865742e:
-			size	= _pe_dot_text_section.size();
-			p		= (byte*)&_pe_dot_text_section[0];
+			{
+				size	= _pe_dot_text_section.size();
+				p		= (byte*)&_pe_dot_text_section[0];
+			}
 			break;
 		case 0x6164722e:
-			size	= _pe_dot_rdata_section.size();
-			p		= (byte*)&_pe_dot_rdata_section[0];
-			
+			{
+				size	= _pe_dot_rdata_section.size();
+				p		= (byte*)&_pe_dot_rdata_section[0];
+			}
 			break;
 		case 0x7461642e:
-			size	= _pe_dot_data_section.size();
-			p		= (byte*)&_pe_dot_data_section[0];
+			{
+				size	= _pe_dot_data_section.size();
+				p		= (byte*)&_pe_dot_data_section[0];
+			}
 			break;
 		case 0x7273722e:
-			size	= _pe_dot_rsrc_section.size();
-			p		= (byte*)&_pe_dot_rsrc_section[0];
+			{
+				size	= _pe_dot_rsrc_section.size();
+				p		= (byte*)&_pe_dot_rsrc_section[0];
+			}
+			break;
+			// .reloc
+		case 0x6c65722e:
+			{
+				size	= _pe_dot_reloc_section.size();
+				p 		= (byte*)&_pe_dot_reloc_section[0];
+			}
 			break;
 		default:
 			break;
@@ -284,6 +308,14 @@ void CPEFile::SaveExeDump(char * filename)
 		_out.insert(_out.begin()+_out.size(),p,p+_eof_dump.size());
 	}
 	
+	//	copy nsis crc
+	{
+		DWORD crc = 0;
+		p = (byte*)&crc;
+		_out.insert(_out.begin()+_out.size(),p,p+sizeof(4));
+	
+	}
+
 	int _crc_offset = CHECKSUM_OFFSET;
 	DWORD crc = PE_CRC(0,&_out[0],_out.size());
 
@@ -315,6 +347,16 @@ std::string CPEFile::GetCodeSegmentHash()
 	return hash;
 }
 
+
+std::string CPEFile::GetDumpHash()
+{
+	int i=0;
+
+	MD5Sum md5;
+	std::string hash =  md5.Calculate(&_eof_dump[0],_eof_dump.size());
+	return hash;
+}
+
 /************************************************************************/
 //	inject the nsis code to the lzma stub
 /************************************************************************/
@@ -333,4 +375,54 @@ bool CPEFile::SetEofSegnemt(std::vector<byte> *eofseg,int varcount)
 	_eof_dump  = * eofseg;
 
 	return false;
+}
+
+/************************************************************************/
+//	update text segment and all data	
+/************************************************************************/
+void CPEFile::ReplaceTextSegment(CPEFile* source)
+{
+	_eof_dump = source->_eof_dump;
+	_pe_dot_rsrc_section = source->_pe_dot_rsrc_section;
+	_pe_nt_header.OptionalHeader.MajorImageVersion = source->_pe_nt_header.OptionalHeader.MajorImageVersion;
+	_pe_nt_header.OptionalHeader.SizeOfImage = source->_pe_nt_header.OptionalHeader.SizeOfImage;
+	//	resource table
+	_pe_nt_header.OptionalHeader.DataDirectory[2] = source->_pe_nt_header.OptionalHeader.DataDirectory[2];
+	// .ndata header
+	*_ndata_header  = *source->_ndata_header;
+	// .rsrc header
+	DWORD pointer_to_raw_data = _rsrc_header->PointerToRawData;
+	*_rsrc_header= *source->_rsrc_header;
+	_rsrc_header->PointerToRawData = pointer_to_raw_data;
+
+	/*
+	int offset = source->_pe_dot_text_section.size() - _pe_dot_text_section.size();
+	int oldPointerToRawData = _text_header->PointerToRawData;
+	// .text
+	_pe_dot_text_section = source->_pe_dot_text_section;
+	*_text_header  = *source->_text_header;
+	// .rdata
+	_pe_dot_rdata_section = source->_pe_dot_rdata_section;
+	_rdata_header->Misc.VirtualSize = source->_rdata_header->Misc.VirtualSize;
+	//	if _rdata_header was placed after _rdata_header
+	if (_rdata_header->PointerToRawData > oldPointerToRawData)
+	{
+		_rdata_header->PointerToRawData += offset;
+	}
+	// .data
+	//	if _data_header was placed after _text_header
+	if (_data_header->PointerToRawData > oldPointerToRawData)
+	{
+		_data_header->PointerToRawData += offset;
+	}
+	// .rsrc
+	//	if _rsrc_header was placed after _text_header
+	if (_rsrc_header->PointerToRawData > oldPointerToRawData)
+	{
+		_rsrc_header->PointerToRawData += offset;
+	}
+
+	*/
+
+	
 }

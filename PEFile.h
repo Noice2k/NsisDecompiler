@@ -18,14 +18,21 @@ public:
 
 	std::vector<byte> * GetEOFSegnemt();
 	bool SetEofSegnemt(std::vector<byte> *eofseg,int varcount);
+
+	std::vector<byte> * GetRCRSSegnemt();
+	bool SetRCRSSegnemt(std::vector<byte> *eofseg,int varcount);
+
 	std::string GetCodeSegmentHash();
+	std::string GetDumpHash();
 	int GetNDataSize();
 	//	save exe dump afer changes
 	void	SaveExeDump(char * filename);
 
 	DWORD	PE_CRC(DWORD  crc, const unsigned char *buf, unsigned int len);
 
-	
+	//	update text segment and all data	
+	void ReplaceTextSegment(CPEFile* source);
+
 	int GetNsisVarCount() ;
 
 private:
@@ -45,7 +52,7 @@ private:
 	std::vector<IMAGE_SECTION_HEADER>	_pe_section_headers;
 
 	//	.text 
-	std::vector<unsigned char> _pe_dot_text_section;
+	std::vector<byte> _pe_dot_text_section;
 	//  .rdata
 	std::vector<byte> _pe_dot_rdata_section;
 	//	.data
@@ -56,6 +63,13 @@ private:
 	std::vector<byte> _pe_dot_reloc_section;
 	//	.eof  - all data what plased after all section and before sign table
 	std::vector<byte> _eof_dump;
+
+
+	IMAGE_SECTION_HEADER * _text_header;
+	IMAGE_SECTION_HEADER * _data_header;
+	IMAGE_SECTION_HEADER * _rsrc_header;
+	IMAGE_SECTION_HEADER * _rdata_header;
+	IMAGE_SECTION_HEADER * _ndata_header;
 
 
 	//	Certificate tabel 
