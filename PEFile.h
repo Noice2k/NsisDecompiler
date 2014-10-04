@@ -28,7 +28,11 @@ public:
 	//	save exe dump afer changes
 	void	SaveExeDump(char * filename);
 
+	// the crc function for PE header;
 	DWORD	PE_CRC(DWORD  crc, const unsigned char *buf, unsigned int len);
+
+	// the crc function for NSIS header
+	DWORD CPEFile::NISI_CRC32(DWORD crc, const unsigned char *buf, unsigned int len);
 
 	//	update text segment and all data	
 	void ReplaceTextSegment(CPEFile* source);

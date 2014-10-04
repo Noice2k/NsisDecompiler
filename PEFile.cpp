@@ -59,6 +59,11 @@ bool	CPEFile::LoadAndParseFile(char * filename)
 	{
 		return false;
 	}
+
+	/*int sss = 82183 -512-4;
+	DWORD crc = NISI_CRC32(0x00,&_pe_full_dump[512],sss);
+	*/
+	
 	int off = 0;
 	//	copy dos header
 	memcpy(&_pe_dos_header,&_pe_full_dump[off],sizeof(_pe_dos_header));
@@ -179,6 +184,31 @@ int CPEFile::GetNDataSize()
 {
 	return _ndata_size;
 
+}
+
+// this is based on the (slow,small) CRC32 implementation from zlib.
+DWORD CPEFile::NISI_CRC32(DWORD crc, const unsigned char *buf, unsigned int len)
+{
+	static DWORD crc_table[256];
+
+	if (!crc_table[1])
+	{
+		DWORD c;
+		int n, k;
+
+		for (n = 0; n < 256; n++)
+		{
+			c = (DWORD)n;
+			for (k = 0; k < 8; k++) c = (c >> 1) ^ (c & 1 ? 0xedb88320L : 0);
+			crc_table[n] = c;
+		}
+	}
+
+	crc = crc ^ 0xffffffffL;
+	while (len-- > 0) {
+		crc = crc_table[(crc ^ (*buf++)) & 0xff] ^ (crc >> 8);
+	}
+	return crc ^ 0xffffffffL;
 }
 
 /************************************************************************/
@@ -305,19 +335,25 @@ void CPEFile::SaveExeDump(char * filename)
 	if (_eof_dump.size()>0)
 	{
 		p = &_eof_dump[0];
-		_out.insert(_out.begin()+_out.size(),p,p+_eof_dump.size());
+		_out.insert(_out.begin()+_out.size(),p,p+_eof_dump.size()-4);
 	}
-	
+
+	int _crc_offset = CHECKSUM_OFFSET;
+	_pe_nt_header.OptionalHeader.CheckSum = 0;
+	memcpy(&_out[_pe_dos_header.e_lfanew],&_pe_nt_header,sizeof(_pe_nt_header));
+
 	//	copy nsis crc
 	{
 		DWORD crc = 0;
+		crc = NISI_CRC32(crc,&_out[512],_out.size()-512);
 		p = (byte*)&crc;
 		_out.insert(_out.begin()+_out.size(),p,p+sizeof(4));
 	
 	}
 
-	int _crc_offset = CHECKSUM_OFFSET;
-	DWORD crc = PE_CRC(0,&_out[0],_out.size());
+
+	
+	/*DWORD crc = PE_CRC(0,&_out[0],_out.size());
 
 
 	crc = (crc & 0xffff) + (crc >> 16);
@@ -327,7 +363,7 @@ void CPEFile::SaveExeDump(char * filename)
 	
 	_pe_nt_header.OptionalHeader.CheckSum = crc;
 	memcpy(&_out[_pe_dos_header.e_lfanew],&_pe_nt_header,sizeof(_pe_nt_header));
-
+	*/
 	CFile file;
 	file.Open(filename,CFile::modeCreate|CFile::modeWrite,NULL);
 	file.Write(&_out[0],_out.size());
