@@ -46,9 +46,6 @@
     <ClInclude Include="GlobalVars.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="NSISEmulator.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -59,6 +56,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MD5Sum.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NSISDebuggerCore.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -81,9 +81,6 @@
     <ClCompile Include="GlobalVars.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="NSISEmulator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -94,6 +91,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="MD5Sum.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NSISDebuggerCore.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -113,7 +113,7 @@
     <ClInclude Include="MD5Sum.h" />
     <ClInclude Include="NsisDecompiler.h" />
     <ClInclude Include="NsisDecompilerDlg.h" />
-    <ClInclude Include="NSISEmulator.h" />
+    <ClInclude Include="NSISDebuggerCore.h" />
     <ClInclude Include="NsisCore.h" />
     <ClInclude Include="PEFile.h" />
     <ClInclude Include="Resource.h" />
@@ -128,7 +128,7 @@
     <ClCompile Include="MD5Sum.cpp" />
     <ClCompile Include="NsisDecompiler.cpp" />
     <ClCompile Include="NsisDecompilerDlg.cpp" />
-    <ClCompile Include="NSISEmulator.cpp" />
+    <ClCompile Include="NSISDebuggerCore.cpp" />
     <ClCompile Include="NsisCore.cpp" />
     <ClCompile Include="PEFile.cpp" />
     <ClCompile Include="stdafx.cpp">

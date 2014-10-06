@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "NSISEmulator.h"
+#include "NSISDebuggerCore.h"
 #include <string>
 #include "NsisDecompiler.h"
 #include "Utils.h"
@@ -10,10 +10,10 @@
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-CNSISEmulator::CNSISEmulator(void)
+CNSISDebuggerCore::CNSISDebuggerCore(void)
 {
 	_need_do_step = false;
-	_runtoPoint = true;
+	_need_run_to_point = false;
 	_need_terminate_main_tread = false;
 }
 
@@ -21,11 +21,10 @@ CNSISEmulator::CNSISEmulator(void)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-CNSISEmulator::~CNSISEmulator(void)
+CNSISDebuggerCore::~CNSISDebuggerCore(void)
 {
+
 }
-
-
 
 
 void EnableSetDebugPrivilege()
@@ -61,10 +60,10 @@ void EnableSetDebugPrivilege()
 
 DWORD WINAPI ThreadProc(CONST LPVOID lpParam) 
 {
-	CNSISEmulator * emul = (CNSISEmulator*) lpParam;
-	if (emul->AttachToProcess())
+	CNSISDebuggerCore * debugger = (CNSISDebuggerCore*) lpParam;
+	if (debugger->AttachToProcess())
 	{
-		emul->Run();
+		debugger->Run();
 	}
 	
 	ExitThread(0);
@@ -73,7 +72,7 @@ DWORD WINAPI ThreadProc(CONST LPVOID lpParam)
 /************************************************************************/
 //	получить список процессов
 /************************************************************************/
-HANDLE CNSISEmulator::FindProcess()
+HANDLE CNSISDebuggerCore::FindProcess()
 {
 	HANDLE hProcessSnap;
 	HANDLE hfindProcess = NULL;
@@ -130,7 +129,7 @@ HANDLE CNSISEmulator::FindProcess()
 /************************************************************************/
 //	
 /************************************************************************/
-bool CNSISEmulator::AttachToProcess()
+bool CNSISDebuggerCore::AttachToProcess()
 {
 	EnableSetDebugPrivilege();
 
@@ -161,7 +160,7 @@ bool CNSISEmulator::AttachToProcess()
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-void CNSISEmulator::CopyStrToWstr(char * in,WCHAR *out)
+void CNSISDebuggerCore::CopyStrToWstr(char * in,WCHAR *out)
 {
 	std::wstring ws;
 	ws.insert(ws.begin(),in,in+strlen(in));
@@ -172,7 +171,7 @@ void CNSISEmulator::CopyStrToWstr(char * in,WCHAR *out)
 /************************************************************************/
 //
 /************************************************************************/
-void CNSISEmulator::CreateStack()
+void CNSISDebuggerCore::CreateStack()
 {
 	/*
 	g_st = NULL;
@@ -211,7 +210,7 @@ void CNSISEmulator::CreateStack()
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-void CNSISEmulator::Execute()
+void CNSISDebuggerCore::Execute()
 {
 	CreateThread(NULL, 0, &ThreadProc, this, 0, NULL);
 }
@@ -219,7 +218,7 @@ void CNSISEmulator::Execute()
 /************************************************************************/
 //
 /************************************************************************/
-DWORD CNSISEmulator::ReadReg(char *key)
+DWORD CNSISDebuggerCore::ReadReg(char *key)
 {
 	DWORD res = 0;
 	HKEY hKey;
@@ -241,7 +240,7 @@ DWORD CNSISEmulator::ReadReg(char *key)
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-bool CNSISEmulator::CloseProcess()
+bool CNSISDebuggerCore::CloseProcess()
 {
 	HANDLE proc = FindProcess();
 	while (proc!= NULL)
@@ -254,7 +253,7 @@ bool CNSISEmulator::CloseProcess()
 /************************************************************************/
 //
 /************************************************************************/
-void  CNSISEmulator::WriteReg(char*key, DWORD value)
+void  CNSISDebuggerCore::WriteReg(char*key, DWORD value)
 {
 	DWORD res = 0;
 	HKEY hKey;
@@ -269,7 +268,7 @@ void  CNSISEmulator::WriteReg(char*key, DWORD value)
 /************************************************************************/
 //	
 /************************************************************************/
-void CNSISEmulator::ReadSteckAndVars()
+void CNSISDebuggerCore::ReadSteckAndVars()
 {
 	DWORD size = NSIS_MAX_STRLEN*sizeof(WCHAR)*_nsis_core->_global_vars._max_var_count;
 	DWORD ret = 0;
@@ -317,10 +316,34 @@ void CNSISEmulator::ReadSteckAndVars()
 	}
 	
 }
+
+/************************************************************************/
+//	
+/************************************************************************/
+DWORD CNSISDebuggerCore::FindReturnPoint()
+{
+	DWORD pos = ReadReg("pos");
+	DWORD startpos = pos;
+	while (pos < _nsis_core->_nsis_script_code.size())
+	{
+		std::string str = _nsis_core->_nsis_script_code[pos];
+		if (str.find("return") == 0x00)
+		{
+			break;
+		}
+		pos ++;
+	}
+	if (startpos == pos)
+	{
+		pos = 0xFFFFFFFF;
+	}
+	return pos;
+}
+
 /************************************************************************/
 //	основной цикл программы
 /************************************************************************/
-void CNSISEmulator::Run()
+void CNSISDebuggerCore::Run()
 {
 	DWORD last_code_position = 0;
 
@@ -329,6 +352,30 @@ void CNSISEmulator::Run()
 	{
 		// read the current point
 		DWORD pos = ReadReg("pos");
+
+		if (_need_run_to_point == true)
+		{
+			if (pos == _run_to_point)
+			{
+				_need_run_to_point = false;
+				_need_do_step = false;
+				last_code_position = pos;
+				ReadSteckAndVars();
+				SendMessage(theApp.GetMainWnd()->GetSafeHwnd(),WM_USER+100,(WPARAM)pos,0);
+			}
+			else
+			{
+				Sleep(10);
+
+				DWORD NeedWait = ReadReg("wait");
+				if (NeedWait == 0)
+				{
+					WriteReg("wait",1);
+				}
+			}
+			continue;
+		}
+
 		if (pos != last_code_position)
 		{
 			last_code_position = pos;

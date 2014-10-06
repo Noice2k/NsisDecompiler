@@ -132,13 +132,8 @@ public:
 
 	//	vector to nsis files (inclide uninstaller, plugins and installation files)
 	std::vector<sfile>  _nsis_files;
-	std::vector<int>	_nsis_function_entry;
-
-	
-
-
-
-
+	std::vector<int>	 _nsis_function_entry;
+	std::vector<std::string>  _nsis_function_entry_name;
 	
 };
 

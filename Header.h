@@ -109,7 +109,7 @@ typedef struct
 	int caption;
 	int back;
 	int next;
-	int clicknext;
+	int clicknext; // caption button next
 	int cancel;
 
 	int parms[5];

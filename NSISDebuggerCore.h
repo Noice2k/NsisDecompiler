@@ -31,11 +31,11 @@ typedef struct _stack_t
 /************************************************************************/
 //	класс эмул€ции выполнени€ NSIS
 /************************************************************************/
-class CNSISEmulator
+class CNSISDebuggerCore
 {
 public:
-	CNSISEmulator(void);
-	~CNSISEmulator(void);
+	CNSISDebuggerCore(void);
+	~CNSISDebuggerCore(void);
 
 	void Init();
 
@@ -52,15 +52,17 @@ public:
 
 	DWORD ReadReg(char *key);
 	void  WriteReg(char*key, DWORD value);
+	DWORD FindReturnPoint();
 
 	void CopyStrToWstr(char * in,WCHAR *out);
-	HANDLE CNSISEmulator::FindProcess();
+	HANDLE FindProcess();
 	void ReadSteckAndVars();
 	bool AttachToProcess();
 	bool CloseProcess();
 	bool _need_do_step;
-	bool _need_do_step_out;
-	bool _runtoPoint;
+	
+	bool	_need_run_to_point;
+	DWORD	_run_to_point;
 	bool _need_terminate_main_tread;
 
 	HANDLE hproc;

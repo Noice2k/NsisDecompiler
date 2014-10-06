@@ -419,7 +419,9 @@ bool CPEFile::SetEofSegnemt(std::vector<byte> *eofseg,int varcount)
 void CPEFile::ReplaceTextSegment(CPEFile* source)
 {
 	_eof_dump = source->_eof_dump;
+
 	_pe_dot_rsrc_section = source->_pe_dot_rsrc_section;
+	//
 	_pe_nt_header.OptionalHeader.MajorImageVersion = source->_pe_nt_header.OptionalHeader.MajorImageVersion;
 	_pe_nt_header.OptionalHeader.SizeOfImage = source->_pe_nt_header.OptionalHeader.SizeOfImage;
 	//	resource table
@@ -427,9 +429,9 @@ void CPEFile::ReplaceTextSegment(CPEFile* source)
 	// .ndata header
 	*_ndata_header  = *source->_ndata_header;
 	// .rsrc header
-	DWORD pointer_to_raw_data = _rsrc_header->PointerToRawData;
+//	DWORD pointer_to_raw_data = _rsrc_header->PointerToRawData;
 	*_rsrc_header= *source->_rsrc_header;
-	_rsrc_header->PointerToRawData = pointer_to_raw_data;
+	//_rsrc_header->PointerToRawData = pointer_to_raw_data;
 
 	/*
 	int offset = source->_pe_dot_text_section.size() - _pe_dot_text_section.size();

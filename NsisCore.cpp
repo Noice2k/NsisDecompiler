@@ -18,113 +18,6 @@ CNsisCore::~CNsisCore(void)
 #endif
 
 
-
-/************************************************************************/
-//	save exe dump afer changes
-/************************************************************************/
-void	CNsisCore::SaveExeDump(char * filename)
-{
-/*	//	выходной буфер
-	std::vector<byte> _out;
-	byte * p = (byte*)&_pe_dos_header;
-	//	dos header
-	_out.insert(_out.begin(),p,p+ sizeof(_pe_dos_header));
-	//	dos stub
-	p = (byte*)&_pe_msdos_stub[0];
-	_out.insert(_out.begin()+_out.size(),p,p+_pe_msdos_stub.size());
-	
-	//	обнулим crc
-	_pe_nt_header.OptionalHeader.CheckSum = 0x00;
-	//	удалим сигнатуру.
-	_pe_nt_header.OptionalHeader.DataDirectory[4].Size = 0;
-	_pe_nt_header.OptionalHeader.DataDirectory[4].VirtualAddress = 0;
-	//	
-	p = (byte*)&_pe_nt_header;
-	_out.insert(_out.begin()+_out.size(),p,p+sizeof(_pe_nt_header));
-
-	
-	//	copy section header
-	int count = _pe_nt_header.FileHeader.NumberOfSections;
-	for (int i= 0x00;i<count;i++)
-	{
-		IMAGE_SECTION_HEADER ish  = _pe_section_headers[i];
-		p = (byte*)&ish;
-		_out.insert(_out.begin()+_out.size(),p,p+sizeof(IMAGE_SECTION_HEADER));
-	}
-
-	//	copy the section data
-	for (unsigned i= 0x00;i<_pe_section_headers.size();i++)
-	{
-		
-		IMAGE_SECTION_HEADER ish = _pe_section_headers[i];
-		DWORD sname = *(DWORD*)&ish.Name[0];
-		unsigned size =0;
-		unsigned offset	= ish.PointerToRawData; 
-
-		switch (sname)
-		{
-			// .tex
-		case 0x7865742e:
-			size	= _pe_dot_text_section.size();
-			p		= (byte*)&_pe_dot_text_section[0];
-			break;
-		case 0x6164722e:
-			size	= _pe_dot_rdata_section.size();
-			p		= (byte*)&_pe_dot_rdata_section[0];
-			
-			break;
-		case 0x7461642e:
-			size	= _pe_dot_data_section.size();
-			p		= (byte*)&_pe_dot_data_section[0];
-			break;
-		case 0x7273722e:
-			size	= _pe_dot_rsrc_section.size();
-			p		= (byte*)&_pe_dot_rsrc_section[0];
-			break;
-		default:
-			break;
-		}
-
-		if (size > 0 )
-		{
-			if (offset != _out.size())
-			{
-				_out.resize(offset);
-				int err=1;
-			}
-			_out.insert(_out.begin()+_out.size(),p,p+size);
-		}
-	}
-	// copy nsis dump
-	if (_dump.size()>0)
-	{
-		p = &_dump[0];
-		_out.insert(_out.begin()+_out.size(),p,p+_dump.size());
-	}
-	
-
-	/**/
-	/*
-	_crc_offset = CHECKSUM_OFFSET;
-	DWORD crc = PE_CRC(0,&_out[0],_out.size());
-
-
-	crc = (crc & 0xffff) + (crc >> 16);
-	crc = (crc) + (crc >> 16);
-	crc = crc & 0xffff;
-	crc += _out.size();
-	
-	_pe_nt_header.OptionalHeader.CheckSum = crc;
-	memcpy(&_out[_pe_dos_header.e_lfanew],&_pe_nt_header,sizeof(_pe_nt_header));
-
-	CFile file;
-	file.Open(filename,CFile::modeCreate|CFile::modeWrite,NULL);
-	file.Write(&_out[0],_out.size());
-	file.Close();
-	*/
-}
-
-
 /************************************************************************/
 //	load dump
 /************************************************************************/
@@ -304,11 +197,98 @@ void CNsisCore::FunctionFormatText(int entstart,std::string functiontype, std::s
 /************************************************************************/
 void CNsisCore::ProcessingFunctions()
 {
-	// function on Init
-	if (_globalheader.code_onInit >= 0)
+	char buff[0x100];
+	_nsis_function_entry_name.resize(_nsis_function_entry.size());
+	for ( unsigned i= 0;  i< _nsis_function_entry.size(); i++)
 	{
-		FunctionFormatText(_globalheader.code_onInit,"Function","OnInit");
+		sprintf_s(buff,0x100,"function%4.4i",_nsis_function_entry[i]);
+		_nsis_function_entry_name[i] = buff;
 	}
+	//
+
+	if (_globalheader.code_onInit!= -1)
+	{
+		_nsis_function_entry.push_back(_globalheader.code_onInit);
+		_nsis_function_entry_name.push_back("OnInit");
+	}
+	
+	if (_globalheader.code_onInstSuccess!= -1)
+	{
+		_nsis_function_entry.push_back(_globalheader.code_onInstSuccess);
+		_nsis_function_entry_name.push_back("onInstSuccess");
+	}
+
+	if (_globalheader.code_onInstFailed!= -1)
+	{
+		_nsis_function_entry.push_back(_globalheader.code_onInstFailed);
+		_nsis_function_entry_name.push_back("onInstFailed");
+	}
+	if (_globalheader.code_onUserAbort!= -1)
+	{
+		_nsis_function_entry.push_back(_globalheader.code_onUserAbort);
+		_nsis_function_entry_name.push_back("onUserAbort");
+	}
+
+	if (_globalheader.code_onGUIInit!= -1)
+	{
+		_nsis_function_entry.push_back(_globalheader.code_onGUIInit);
+		_nsis_function_entry_name.push_back("onGUIInit");
+	}
+	if (_globalheader.code_onGUIEnd!= -1)
+	{
+		_nsis_function_entry.push_back(_globalheader.code_onGUIEnd);
+		_nsis_function_entry_name.push_back("onGUIEnd");
+	}
+
+	if (_globalheader.code_onMouseOverSection!= -1)
+	{
+		_nsis_function_entry.push_back(_globalheader.code_onMouseOverSection);
+		_nsis_function_entry_name.push_back("onMouseOverSection");
+	}
+
+	if (_globalheader.code_onVerifyInstDir!= -1)
+	{
+		_nsis_function_entry.push_back(_globalheader.code_onVerifyInstDir);
+		_nsis_function_entry_name.push_back("onVerifyInstDir");
+	}
+
+	if (_globalheader.code_onSelChange!= -1)
+	{
+		_nsis_function_entry.push_back(_globalheader.code_onSelChange);
+		_nsis_function_entry_name.push_back("onSelChange");
+	}
+
+	if (_globalheader.code_onRebootFailed!= -1)
+	{
+		_nsis_function_entry.push_back(_globalheader.code_onRebootFailed);
+		_nsis_function_entry_name.push_back("onRebootFailed");
+	}
+
+	for (unsigned i = 0x00;i < _nsis_pages.size();i++)
+	{
+		page pg =_nsis_pages[i];
+		if (pg.prefunc!=-1)
+		{
+			_nsis_function_entry.push_back(pg.prefunc);
+			sprintf_s(buff,0x100,"page#%i_prefunc",pg.dlg_id);
+			_nsis_function_entry_name.push_back(buff);
+		}
+
+		if (pg.showfunc!=-1)
+		{
+			_nsis_function_entry.push_back(pg.showfunc);
+			sprintf_s(buff,0x100,"page#%i_showfunc",pg.dlg_id);
+			_nsis_function_entry_name.push_back(buff);
+		}
+
+		if (pg.leavefunc!=-1)
+		{
+			_nsis_function_entry.push_back(pg.leavefunc);
+			sprintf_s(buff,0x100,"page#%i_leavefunc",pg.dlg_id);
+			_nsis_function_entry_name.push_back(buff);
+		}
+	}
+
 	for (unsigned i = 0x00; i<_nsis_section.size();i++)
 	{
 		section s = _nsis_section[i];
@@ -318,11 +298,10 @@ void CNsisCore::ProcessingFunctions()
 		}
 	}
 
-	char buff[0x100];
 	for ( unsigned i= 0;  i< _nsis_function_entry.size(); i++)
 	{
-		sprintf_s(buff,0x100,"function%4.4i",_nsis_function_entry[i]);
-		FunctionFormatText(_nsis_function_entry[i],"Function",buff);
+		
+		FunctionFormatText(_nsis_function_entry[i],"Function",_nsis_function_entry_name[i]);
 	}
 
 	std::string allcode;

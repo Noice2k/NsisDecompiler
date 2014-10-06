@@ -30,17 +30,20 @@ void CNsisDecompilerDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_LIST4, m_Variables);
 	DDX_Control(pDX, IDC_LIST5, m_CallSteck);
 	DDX_Control(pDX, IDC_EDIT1, m_EditFileName);
+	DDX_Control(pDX, IDC_EDIT2, m_EditGotoLine);
 }
 
 BEGIN_MESSAGE_MAP(CNsisDecompilerDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
-	ON_BN_CLICKED(IDC_BUTTON1, &CNsisDecompilerDlg::OnBnClickedButton1)
+	ON_BN_CLICKED(IDC_BUTTON1, &CNsisDecompilerDlg::OnBnClickedLoadFile)
 	ON_BN_CLICKED(IDOK, &CNsisDecompilerDlg::OnBnClickedOk)
 	ON_BN_CLICKED(IDCANCEL, &CNsisDecompilerDlg::OnBnClickedCancel)
-	ON_BN_CLICKED(IDC_BUTTON2, &CNsisDecompilerDlg::OnBnClickedButton2)
-	ON_BN_CLICKED(IDC_BUTTON3, &CNsisDecompilerDlg::OnBnClickedButton3)
-	ON_BN_CLICKED(IDC_BUTTON4, &CNsisDecompilerDlg::OnBnClickedButton4)
+	ON_BN_CLICKED(IDC_BUTTON2, &CNsisDecompilerDlg::OnBnClickedStep)
+	ON_BN_CLICKED(IDC_BUTTON3, &CNsisDecompilerDlg::OnBnClickedStepOut)
+	ON_BN_CLICKED(IDC_BUTTON4, &CNsisDecompilerDlg::OnBnClickedSelectFile)
+	ON_BN_CLICKED(IDC_BUTTON5, &CNsisDecompilerDlg::OnBnClickedGoto)
+	ON_BN_CLICKED(IDC_BUTTON6, &CNsisDecompilerDlg::OnBnClickedStepIn)
 END_MESSAGE_MAP()
 
 
@@ -87,10 +90,9 @@ BOOL CNsisDecompilerDlg::OnInitDialog()
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
-// If you add a minimize button to your dialog, you will need the code below
-//  to draw the icon.  For MFC applications using the document/view model,
-//  this is automatically done for you by the framework.
-
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
 void CNsisDecompilerDlg::LoadSourceCode()
 {
 	CString num;
@@ -108,6 +110,10 @@ void CNsisDecompilerDlg::LoadSourceCode()
 	}
 
 }
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
 void CNsisDecompilerDlg::OnPaint()
 {
 	if (IsIconic())
@@ -144,7 +150,7 @@ HCURSOR CNsisDecompilerDlg::OnQueryDragIcon()
 /************************************************************************/
 //	start decompile file
 /************************************************************************/
-void CNsisDecompilerDlg::OnBnClickedButton1()
+void CNsisDecompilerDlg::OnBnClickedLoadFile()
 {
 
 	CString filename;
@@ -156,9 +162,9 @@ void CNsisDecompilerDlg::OnBnClickedButton1()
 		return;
 	}
 
-	_nsisEmulator._nsis_core = &_nsis_core;
-	_nsisEmulator.filename =  filename;
-	_nsisEmulator.CloseProcess();
+	_nsis_debugger._nsis_core = &_nsis_core;
+	_nsis_debugger.filename =  filename;
+	_nsis_debugger.CloseProcess();
 
 	CPEFile source_pe;
 	CPEFile dest_pe;
@@ -172,7 +178,7 @@ void CNsisDecompilerDlg::OnBnClickedButton1()
 		//	this is nsis "Nullsoft Install System v2.46.1-Unicode lzma_solid stub"  ?
 		std::string str = source_pe.GetCodeSegmentHash();
 		
-		if (str == "3291075913c14a1799655a261fb21cca")
+		//if (str == "3291075913c14a1799655a261fb21cca")
 		{
 			//	load the "Nullsoft Install System v2.46.1-Unicode lzma_solid stub with debug code"
 			if (dest_pe.LoadAndParseFile("D:\\Nsis_debug\\stubs\\2.46.1_unicode_debug\\lzma_solid"))
@@ -180,14 +186,17 @@ void CNsisDecompilerDlg::OnBnClickedButton1()
 				dest_pe.ReplaceTextSegment(&source_pe);
 				//source_pe.ReplaceTextSegment(&dest_pe);
 				filename+="_dbg.exe";
+
+				_nsis_debugger.filename =  filename;
+				_nsis_debugger.CloseProcess();
 				//source_pe.SaveExeDump(filename.GetBuffer());
 				dest_pe.SaveExeDump(filename.GetBuffer());
 				str2 = dest_pe.GetDumpHash();
 			} 
 		}
 	}
-
-	_nsisEmulator.filename =  filename;
+	
+	
 	if (true == _pe_file.LoadAndParseFile(filename.GetBuffer()))
 	{
 
@@ -196,12 +205,14 @@ void CNsisDecompilerDlg::OnBnClickedButton1()
 		_nsis_core._global_vars.SetVarCount(_pe_file.GetNsisVarCount());
 		_nsis_core.ProcessingHeader();
 		LoadSourceCode();
-		_nsisEmulator.Execute();
+		_nsis_debugger.Execute();
 	}
 }
 
 
-
+/************************************************************************/
+//
+/************************************************************************/
 void CNsisDecompilerDlg::OnBnClickedOk()
 {
 	// TODO: Add your control notification handler code here
@@ -213,12 +224,6 @@ void CNsisDecompilerDlg::OnBnClickedCancel()
 {
 	// TODO: Add your control notification handler code here
 	CDialogEx::OnCancel();
-}
-
-
-void CNsisDecompilerDlg::OnBnClickedButton2()
-{
-	_nsisEmulator._need_do_step = true;
 }
 
 void	CNsisDecompilerDlg::ShowVariables()
@@ -234,11 +239,11 @@ void	CNsisDecompilerDlg::ShowStack()
 {
 	m_Stack.DeleteAllItems();
 	CString num;
-	for (unsigned i = 0x00;i< _nsisEmulator._stack.size();i++)
+	for (unsigned i = 0x00;i< _nsis_debugger._stack.size();i++)
 	{
 		num.Format("%4.4i",i);
 		m_Stack.InsertItem(i,num,0);
-		m_Stack.SetItemText(i,1,_nsisEmulator._stack[i].c_str());
+		m_Stack.SetItemText(i,1,_nsis_debugger._stack[i].c_str());
 	}
 }
 
@@ -249,29 +254,21 @@ void	CNsisDecompilerDlg::ShowCallStack()
 	m_CallSteck.InsertColumn(1,"value",LVCFMT_LEFT,450);
 
 	CString num;
-	for (unsigned i = 0x00;i< _nsisEmulator._function_call_stack.size();i++)
+	for (unsigned i = 0x00;i< _nsis_debugger._function_call_stack.size();i++)
 	{
 		num.Format("%4.4i",i);
 		m_CallSteck.InsertItem(i,num,0);
-		m_CallSteck.SetItemText(i,1,_nsisEmulator._function_call_stack[i].c_str());
+		m_CallSteck.SetItemText(i,1,_nsis_debugger._function_call_stack[i].c_str());
 	}
 }
 
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
 LRESULT CNsisDecompilerDlg::DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	if (message == WM_USER+100)
 	{
-	/*	POSITION pos = m_SourceCode.GetFirstSelectedItemPosition();
-		while( pos >0) 
-		{
-
-			int  index = m_SourceCode.GetNextSelectedItem( pos );
-			m_SourceCode.SetItemState(index, 0, LVS_SHOWSELALWAYS|LVS_SINGLESEL);
-		}
-		*/
-	
-		
-		
 		if ((-1 != m_lastitem) && (m_lastitem != wParam))
 		{
 			m_SourceCode.SetItem(m_lastitem,0,LVIF_IMAGE,NULL,0,0,0,NULL,0);
@@ -304,16 +301,6 @@ LRESULT CNsisDecompilerDlg::DefWindowProc(UINT message, WPARAM wParam, LPARAM lP
 		ShowVariables();
 		ShowStack();
 		//ShowCallStack();
-
-/*
-		int nLast = n + m_myListCtrl.GetCountPerPage();
-
-		for (; n < nLast; n++)
-		{
-			m_myListCtrl.SetItemState(n, LVIS_SELECTED, LVIS_SELECTED);
-			ASSERT(m_myListCtrl.GetItemState(n, LVIS_SELECTED) == LVIS_SELECTED); 
-		}
-		*/
 		return true;
 	}
 
@@ -321,13 +308,9 @@ LRESULT CNsisDecompilerDlg::DefWindowProc(UINT message, WPARAM wParam, LPARAM lP
 }
 
 
-void CNsisDecompilerDlg::OnBnClickedButton3()
-{
-	_nsisEmulator._need_do_step_out = true;
-	_nsisEmulator._need_do_step = true;
-	
-}
-
+/************************************************************************/
+//
+/************************************************************************/
 static int CALLBACK BrowseCallbackProc(HWND hwnd,UINT uMsg, LPARAM lParam, LPARAM lpData)
 {
 
@@ -341,6 +324,9 @@ static int CALLBACK BrowseCallbackProc(HWND hwnd,UINT uMsg, LPARAM lParam, LPARA
 	return 0;
 }
 
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
 std::string BrowseFolder(std::string saved_path)
 {
 	TCHAR path[MAX_PATH];
@@ -374,14 +360,78 @@ std::string BrowseFolder(std::string saved_path)
 	return "";
 }
 
-void CNsisDecompilerDlg::OnBnClickedButton4()
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+void CNsisDecompilerDlg::OnBnClickedSelectFile()
 {
-	//return false;
-
 	CFileDialog dlg(true,"All Files(*.*)|*.*||","*.*",OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR, "*.*");
-
 	auto result = dlg.DoModal();
 	if(result != IDOK) return ; // failed
 	m_EditFileName.SetWindowText(dlg.GetPathName());
+}
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+void CNsisDecompilerDlg::OnBnClickedGoto()
+{
+	CString str;
+	m_EditGotoLine.GetWindowText(str);
+	DWORD pos = (DWORD)atoi(str);
+
+	if (pos > _nsis_core._nsis_script_code.size())
+	{
+		return;
+	}
+
+	_nsis_debugger._need_run_to_point = true;
+	_nsis_debugger._run_to_point = pos;
 	
+}
+
+/************************************************************************/
+// just go to the next instuction
+/************************************************************************/
+void CNsisDecompilerDlg::OnBnClickedStepIn()
+{
+	_nsis_debugger._need_do_step = true;
+
+}
+
+/************************************************************************/
+//	find the pos with "return" and go to it
+/************************************************************************/
+void CNsisDecompilerDlg::OnBnClickedStepOut()
+{
+	DWORD pos =  _nsis_debugger.FindReturnPoint();
+	if (pos != 0xFFFFFFFF)
+	{
+		_nsis_debugger._run_to_point =pos;
+		_nsis_debugger._need_run_to_point = true;
+	}
+	else
+	{
+		_nsis_debugger._need_do_step = true;
+	}
+}
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+void CNsisDecompilerDlg::OnBnClickedStep()
+{
+
+	DWORD pos = _nsis_debugger.ReadReg("pos");
+	std::string str = _nsis_core._nsis_script_code[pos];
+	if (str.find("Call") == 0x00)
+	{
+		_nsis_debugger._run_to_point =pos+1;
+		_nsis_debugger._need_run_to_point = true;
+		_nsis_debugger._need_do_step = false;
+	}
+	else
+	{
+		_nsis_debugger._need_do_step = true;
+	}
 }

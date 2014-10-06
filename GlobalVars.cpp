@@ -88,7 +88,6 @@ std::string CGlobalVars::GetVarName(int id)
 		case 30: str = "$_CLICK";break;       // 30
 		case 31: str = "$OUTDIR";break;       // 31
 
-
 		default:
 			{
 				char buff[0x100];

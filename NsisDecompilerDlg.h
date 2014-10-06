@@ -5,7 +5,7 @@
 #pragma once
 #include "afxcmn.h"
 #include "NsisCore.h"
-#include "NSISEmulator.h"
+#include "NSISDebuggerCore.h"
 #include "PEFile.h"
 #include "afxwin.h"
 
@@ -34,13 +34,13 @@ protected:
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 public:
-	afx_msg void OnBnClickedButton1();
+	
 	
 	
 	//	nsis core 
 	CNsisCore	_nsis_core;
 	//	nsis debug engine
-	CNSISEmulator _nsisEmulator;
+	CNSISDebuggerCore _nsis_debugger;
 	//	pe file
 	CPEFile		_pe_file;
 
@@ -57,15 +57,20 @@ public:
 	CListCtrl m_Variables;
 	CListCtrl m_CallSteck;
 	CImageList m_ImageList;
+	CEdit m_EditFileName;
 
 	void	ShowVariables();
 	void	ShowStack();
 	void	ShowCallStack();
 
-	int m_lastitem;
-	afx_msg void OnBnClickedButton2();
 	virtual LRESULT DefWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
-	afx_msg void OnBnClickedButton3();
-	CEdit m_EditFileName;
-	afx_msg void OnBnClickedButton4();
+	int m_lastitem;
+	
+	afx_msg void OnBnClickedLoadFile();
+	afx_msg void OnBnClickedStep();
+	afx_msg void OnBnClickedStepOut();
+	afx_msg void OnBnClickedSelectFile();
+	CEdit m_EditGotoLine;
+	afx_msg void OnBnClickedGoto();
+	afx_msg void OnBnClickedStepIn();
 };
