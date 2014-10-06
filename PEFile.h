@@ -27,6 +27,8 @@ public:
 	int GetNDataSize();
 	//	save exe dump afer changes
 	void	SaveExeDump(char * filename);
+    //	save exe dump afer changes
+    void    SaveExeDump_v2(char * filename);
 
 	// the crc function for PE header;
 	DWORD	PE_CRC(DWORD  crc, const unsigned char *buf, unsigned int len);
@@ -80,6 +82,8 @@ private:
 	std::vector<byte> _pe_certificatr_table;
 	//	resource table
 	std::vector<byte> _pe_resource_table;
+
+    
 
 	int _ndata_size;
 	

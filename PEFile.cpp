@@ -241,6 +241,95 @@ int CPEFile::GetNsisVarCount()
 	c/= (NSIS_MAX_STRLEN*sizeof(WCHAR));
 	return c;
 }
+
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+void CPEFile::SaveExeDump_v2(char * filename)
+{
+    //	выходной буфер
+    std::vector<byte> _out;
+    byte * p = (byte*)&_pe_dos_header;
+    //	dos header
+    _out.insert(_out.begin(),p,p+ sizeof(_pe_dos_header));
+    //	dos stub
+    p = (byte*)&_pe_msdos_stub[0];
+    _out.insert(_out.begin()+_out.size(),p,p+_pe_msdos_stub.size());
+
+    //	обнулим crc
+    _pe_nt_header.OptionalHeader.CheckSum = 0x00;
+    //	удалим сигнатуру.
+    _pe_nt_header.OptionalHeader.DataDirectory[4].Size = 0;
+    _pe_nt_header.OptionalHeader.DataDirectory[4].VirtualAddress = 0;
+    //	
+    p = (byte*)&_pe_nt_header;
+    _out.insert(_out.begin()+_out.size(),p,p+sizeof(_pe_nt_header));
+    
+    int headers_offset = _out.size();
+    //	copy section header
+	int count = _pe_nt_header.FileHeader.NumberOfSections;
+	for (int i= 0x00;i<count;i++)
+	{
+		IMAGE_SECTION_HEADER ish  = _pe_section_headers[i];
+		p = (byte*)&ish;
+		_out.insert(_out.begin()+_out.size(),p,p+sizeof(IMAGE_SECTION_HEADER));
+	}
+
+    //  save section .text
+    DWORD size	= _pe_dot_text_section.size();
+    p		= (byte*)&_pe_dot_text_section[0];
+    _out.insert(_out.begin()+_out.size(),p,p+size);
+
+    // save section .rdata
+    _rdata_header->PointerToRawData = _out.size();
+    size	= _pe_dot_rdata_section.size();
+    p		= (byte*)&_pe_dot_rdata_section[0];
+    _out.insert(_out.begin()+_out.size(),p,p+size);
+    // save section .data
+     _data_header->PointerToRawData = _out.size();
+    size	= _pe_dot_data_section.size();
+    p		= (byte*)&_pe_dot_data_section[0];
+     _out.insert(_out.begin()+_out.size(),p,p+size);
+    //  save section .rcrs
+     _rdata_header->PointerToRawData = _out.size();
+    size	= _pe_dot_rsrc_section.size();
+    p		= (byte*)&_pe_dot_rsrc_section[0];
+    _out.insert(_out.begin()+_out.size(),p,p+size);
+
+    // copy nsis dump
+    if (_eof_dump.size()>0)
+    {
+        p = &_eof_dump[0];
+        _out.insert(_out.begin()+_out.size(),p,p+_eof_dump.size()-4);
+    }
+
+    int _crc_offset = CHECKSUM_OFFSET;
+    _pe_nt_header.OptionalHeader.CheckSum = 0;
+    memcpy(&_out[_pe_dos_header.e_lfanew],&_pe_nt_header,sizeof(_pe_nt_header));
+
+   	count = _pe_nt_header.FileHeader.NumberOfSections;
+	for (int i= 0x00;i<count;i++)
+	{
+		IMAGE_SECTION_HEADER ish  = _pe_section_headers[i];
+		p = (byte*)&ish;
+        memcpy(&_out[headers_offset],p,sizeof(IMAGE_SECTION_HEADER));
+        headers_offset+= sizeof(IMAGE_SECTION_HEADER);
+	}
+    //	copy nsis crc
+    {
+        DWORD crc = 0;
+        crc = NISI_CRC32(crc,&_out[512],_out.size()-512);
+        p = (byte*)&crc;
+        _out.insert(_out.begin()+_out.size(),p,p+sizeof(4));
+
+    }
+    CFile file;
+    file.Open(filename,CFile::modeCreate|CFile::modeWrite,NULL);
+    file.Write(&_out[0],_out.size());
+    file.Close();
+    return;
+
+}
 /************************************************************************/
 //	save exe dump afer changes
 /************************************************************************/

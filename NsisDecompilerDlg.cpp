@@ -190,7 +190,8 @@ void CNsisDecompilerDlg::OnBnClickedLoadFile()
 				_nsis_debugger.filename =  filename;
 				_nsis_debugger.CloseProcess();
 				//source_pe.SaveExeDump(filename.GetBuffer());
-				dest_pe.SaveExeDump(filename.GetBuffer());
+				//dest_pe.SaveExeDump(filename.GetBuffer());
+                dest_pe.SaveExeDump_v2(filename.GetBuffer());
 				str2 = dest_pe.GetDumpHash();
 			} 
 		}
