@@ -177,11 +177,12 @@ void CNsisDecompilerDlg::OnBnClickedLoadFile()
 
 		//	this is nsis "Nullsoft Install System v2.46.1-Unicode lzma_solid stub"  ?
 		std::string str = source_pe.GetCodeSegmentHash();
+		_nsis_core.SetCompressionMethod(str);
 		
 		//if (str == "3291075913c14a1799655a261fb21cca")
 		{
 			//	load the "Nullsoft Install System v2.46.1-Unicode lzma_solid stub with debug code"
-			if (dest_pe.LoadAndParseFile("D:\\Nsis_debug\\stubs\\2.46.1_unicode_debug\\lzma_solid"))
+			if (dest_pe.LoadAndParseFile("D:\\Nsis_debug\\stubs\\2.46.1_unicode_debug\\zlib_solid"))
 			{
 				dest_pe.ReplaceTextSegment(&source_pe);
 				//source_pe.ReplaceTextSegment(&dest_pe);
@@ -191,6 +192,7 @@ void CNsisDecompilerDlg::OnBnClickedLoadFile()
 				_nsis_debugger.CloseProcess();
 				//source_pe.SaveExeDump(filename.GetBuffer());
 				//dest_pe.SaveExeDump(filename.GetBuffer());
+				
                 dest_pe.SaveExeDump_v2(filename.GetBuffer());
 				str2 = dest_pe.GetDumpHash();
 			} 
@@ -205,6 +207,7 @@ void CNsisDecompilerDlg::OnBnClickedLoadFile()
 		_nsis_core.SetNsisDump(_pe_file.GetEOFSegnemt());
 		_nsis_core._global_vars.SetVarCount(_pe_file.GetNsisVarCount());
 		_nsis_core.ProcessingHeader();
+		_nsis_core.DumpFiles("d:\\1234");
 		LoadSourceCode();
 		_nsis_debugger.Execute();
 	}

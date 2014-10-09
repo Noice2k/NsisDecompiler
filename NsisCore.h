@@ -34,7 +34,8 @@ public:
 	
 	//	save all nsis files to disk
 	void	DumpFiles(char * path);
-		
+	//	
+	void SetCompressionMethod(std::string method);
 
 	//	save exe dump afer changes
 	void	SaveExeDump(char * filename);

@@ -26,6 +26,12 @@ void CNsisCore::SetNsisDump(std::vector<byte> *source)
 	_dump = *source;
 }
 
+//	
+void CNsisCore::SetCompressionMethod(std::string method)
+{
+	_compressor.SetCompressionMethod(method);
+}
+
 /************************************************************************/
 //	save all nsis files to disk
 /************************************************************************/
@@ -140,10 +146,11 @@ bool	CNsisCore::ProcessingHeader()
 			*/
 		}
 	}
-	std::string str1 = GetNsisString(_globalheader.install_directory_ptr,true);
+	/*std::string str1 = GetNsisString(_globalheader.install_directory_ptr,true);
 	_global_vars.SetVarValue(21,str1);
 	_global_vars.SetVarValue(25,"d:\\temp\\");
 	std::string str2 = GetNsisString(_globalheader.install_directory_auto_append,true);
+	*/
 	return false;
 }
 

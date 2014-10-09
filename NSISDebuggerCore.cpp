@@ -138,7 +138,8 @@ bool CNSISDebuggerCore::AttachToProcess()
 	STARTUPINFO cif;
 	ZeroMemory(&cif,sizeof(STARTUPINFO));
 	memset(&_debug_process_info,0,sizeof(_debug_process_info));
-	BOOL bres = CreateProcess(filename.c_str(),NULL,NULL,NULL,FALSE,0,NULL,NULL,&cif,&_debug_process_info);
+	std::string cmdline = filename + " /NCRC";
+	BOOL bres = CreateProcess(filename.c_str(),(LPSTR)cmdline.c_str(),NULL,NULL,FALSE,0,NULL,NULL,&cif,&_debug_process_info);
 	Sleep(1000);
 
 	hproc = FindProcess();
@@ -270,7 +271,7 @@ void  CNSISDebuggerCore::WriteReg(char*key, DWORD value)
 /************************************************************************/
 void CNSISDebuggerCore::ReadSteckAndVars()
 {
-	DWORD size = NSIS_MAX_STRLEN*sizeof(WCHAR)*_nsis_core->_global_vars._max_var_count;
+	DWORD size = NSIS_MAX_STRLEN*sizeof(WCHAR)*(_nsis_core->_global_vars._max_var_count-3);
 	DWORD ret = 0;
 	BYTE *uservar  = new BYTE[size];
 	DWORD pst = ReadReg("vars");
@@ -282,7 +283,7 @@ void CNSISDebuggerCore::ReadSteckAndVars()
 		file.Open("d:\\dump.txt",CFile::modeCreate|CFile::modeWrite,NULL);
 		file.Write(uservar,size);
 		file.Close();
-		for (int i = 0x00;i < _nsis_core->_global_vars._max_var_count;i++)
+		for (int i = 0x00;i < _nsis_core->_global_vars._max_var_count -3;i++)
 		{
 			byte * pp = uservar+ i*(NSIS_MAX_STRLEN*sizeof(WCHAR))+i*8;
 			WCHAR *w = (WCHAR*)(uservar+ i*(NSIS_MAX_STRLEN*sizeof(WCHAR))+i*8);

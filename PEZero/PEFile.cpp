@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "PEFile.h"
-#include "MD5Sum.h"
+#include "../MD5Sum.h"
 
 /************************************************************************/
 //

@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "LZMA.h"
-#include "lzma/LzmaDec.h"
-#include "lzma/LzmaLib.c"
+//#include "lzma/LzmaDec.h"
+//#include "lzma/LzmaLib.c"
 
 /************************************************************************/
 /*                                                                      */
@@ -25,7 +25,7 @@ CLZMA::~CLZMA(void)
 //	extract buffer
 /************************************************************************/
 bool CLZMA::Inflate(byte* inbuff,size_t ilength,std::vector<byte> *out_vect)
-{
+{/*
 	SRes result = 0;
 	//	lzma decoder state
 	CLzmaDec _state;
@@ -36,7 +36,7 @@ bool CLZMA::Inflate(byte* inbuff,size_t ilength,std::vector<byte> *out_vect)
 	out_vect->resize(0);
 	
 	/* header: 5 bytes of LZMA properties*/
-	unsigned char lheader[LZMA_PROPS_SIZE ];
+/*	unsigned char lheader[LZMA_PROPS_SIZE ];
 	memcpy(lheader,inbuff,LZMA_PROPS_SIZE);
 	ilength -= (LZMA_PROPS_SIZE);
 	inbuff  += (LZMA_PROPS_SIZE);
@@ -84,5 +84,6 @@ bool CLZMA::Inflate(byte* inbuff,size_t ilength,std::vector<byte> *out_vect)
 		}
 	}
 	LzmaDec_Free(&_state, &g_Alloc);
+	*/
 	return true;
 }
